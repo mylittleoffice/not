@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#12131b">
+
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://accounts.google.com https://*.firebaseio.com;
+  style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://accounts.google.com;
+  img-src 'self' data:;
+  connect-src 'self' https://www.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://api.emailjs.com;
+  frame-src 'self' https://accounts.google.com https://*.firebaseio.com https://*.firebaseapp.com;
+  font-src 'self' data:;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+">
+
+<!-- Tema, sayfa çizilmeden önce uygulanır (yanıp sönmeyi önler) -->
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('notes-tema'); } catch (e) {}
+  if (t !== 'light' && t !== 'dark') {
+    t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+<title>Note's</title>
+<link rel="icon" href="lock.png" type="image/png">
+
+<style>
+:root {
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+:root, [data-theme="light"] {
+  --bg: #f2f4f9;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --border: #dde2ec;
+  --text: #1b1e2b;
+  --muted: #646b85;
+  --accent: #2f6fed;
+  --accent-hover: #2459c7;
+  --accent-soft: rgba(47, 111, 237, .12);
+  --danger: #dc3e42;
+  --danger-soft: rgba(220, 62, 66, .10);
+  --warn: #d97a00;
+  --success: #2b9a66;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 8px 24px rgba(16, 24, 40, .06);
+  --overlay: rgba(15, 18, 30, .45);
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: #12131b;
+  --surface: #1b1d29;
+  --surface-2: #242736;
+  --border: #30344a;
+  --text: #e7e9f3;
+  --muted: #9499b3;
+  --accent: #5b93ff;
+  --accent-hover: #79a7ff;
+  --accent-soft: rgba(91, 147, 255, .15);
+  --danger: #f0585d;
+  --danger-soft: rgba(240, 88, 93, .14);
+  --warn: #f5a524;
+  --success: #3dbf84;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+  --overlay: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background-color .25s, color .25s;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+
+.app { width: 100%; max-width: 640px; margin: 0 auto; padding: 16px 16px 32px; flex: 1; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  transition: background-color .25s, border-color .25s;
+}
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+
+/* ---------- Form elemanları ---------- */
+.field {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s, background-color .25s;
+}
+.field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field::placeholder { color: var(--muted); }
+.lbl { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: 600;
+  transition: background-color .15s, border-color .15s, color .15s, transform .05s;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn.danger { background: var(--danger-soft); color: var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+.btn.small { padding: 5px 10px; font-size: .82rem; }
+.btn.block { width: 100%; }
+
+.icon-btn {
+  flex: none;
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 18px;
+  transition: background-color .15s, border-color .15s;
+}
+.icon-btn:hover { background: var(--surface-2); border-color: var(--accent); }
+.icon-btn.aktif { background: var(--accent-soft); border-color: var(--accent); }
+
+.pw { position: relative; }
+.pw .field { padding-right: 50px; }
+.pw-btn {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  width: 38px; height: 38px;
+  border: none; background: transparent; border-radius: 8px;
+  font-size: 18px; color: var(--muted);
+}
+.pw-btn:hover { background: var(--surface); }
+
+/* ---------- Giriş ---------- */
+.login { max-width: 400px; margin: 9vh auto 0; text-align: center; padding: 32px 24px; }
+.login-logo { width: 64px; height: 64px; margin-bottom: 6px; }
+.login h1 { margin: 0; font-size: 1.6rem; letter-spacing: -.01em; }
+.login form { display: flex; flex-direction: column; gap: 14px; margin-top: 24px; text-align: left; }
+.link-btn { background: none; border: none; color: var(--accent); padding: 8px; margin-top: 10px; font-weight: 600; }
+.link-btn:hover { text-decoration: underline; }
+.tema-kose { position: fixed; top: 16px; right: 16px; }
+
+/* ---------- Üst çubuk ---------- */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 8px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand img { width: 34px; height: 34px; flex: none; }
+.brand-yazi { min-width: 0; }
+.brand-ad { font-weight: 800; font-size: 1.2rem; line-height: 1.1; }
+.brand-alt { font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-actions { display: flex; gap: 8px; align-items: center; }
+
+.toolbar {
+  display: flex; gap: 8px;
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: 10px 0;
+  margin-bottom: 8px;
+  transition: background-color .25s;
+}
+.search { position: relative; flex: 1; min-width: 0; }
+.search .field { padding-left: 40px; padding-right: 44px; height: 44px; }
+.search-ikon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 15px; }
+.temizleBtn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: none; background: transparent; color: var(--muted); border-radius: 8px; }
+.temizleBtn:hover { background: var(--surface); color: var(--text); }
+
+/* ---------- Kayıt formu ---------- */
+.form-card { transition: border-color .2s, box-shadow .2s; }
+.form-card.duzenleme { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(245, 165, 36, .18); }
+.form-card h2 { margin: 0 0 12px; font-size: 1rem; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.form-actions { display: flex; gap: 8px; margin-top: 4px; }
+.form-actions .btn { flex: 1; }
+
+/* ---------- Liste ---------- */
+.list-title { display: flex; align-items: center; gap: 8px; margin: 26px 0 12px; font-size: 1rem; }
+.badge { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 10px; font-size: .8rem; font-weight: 700; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.kayit {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow);
+  transition: border-color .15s, background-color .25s;
+  animation: giris .2s ease;
+}
+.kayit:hover { border-color: var(--accent); }
+.kayit.duzenleniyor { border-color: var(--warn); }
+.kayit-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.kayitZamani { font-size: .75rem; color: var(--muted); }
+.kayit-aksiyon { display: flex; gap: 6px; }
+.bilgiSatiri { display: flex; align-items: flex-start; gap: 8px; }
+.kopyalaBtn {
+  flex: none; width: 30px; height: 30px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+  font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+  transition: color .15s, border-color .15s;
+}
+.kopyalaBtn:hover { color: var(--accent); border-color: var(--accent); }
+.kayit-metin {
+  flex: 1; min-width: 0;
+  word-break: break-word; white-space: pre-wrap;
+  padding-top: 3px;
+  font-family: var(--mono); font-size: .92rem;
+  transition: filter .2s;
+}
+.bilgiSatiri.baslik .kayit-metin { font-family: var(--font); font-weight: 700; font-size: 1rem; }
+.kayit-metin a { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.gizli-mod .gizlenebilir:not(.acik) { filter: blur(6px); cursor: pointer; user-select: none; }
+.empty { text-align: center; color: var(--muted); padding: 32px 16px; border: 1px dashed var(--border); border-radius: var(--radius); }
+
+/* ---------- Menü ---------- */
+.dropdown { position: relative; }
+.dropdown-content {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  min-width: 200px; padding: 6px; z-index: 20;
+  display: none;
+}
+.dropdown-content.show { display: block; animation: fade .12s; }
+.dropdown-content button {
+  display: flex; width: 100%; gap: 10px; align-items: center;
+  padding: 10px 12px; border: none; background: none; color: var(--text);
+  border-radius: 8px; text-align: left; font-size: .95rem;
+}
+.dropdown-content button:hover { background: var(--surface-2); }
+
+/* ---------- Not penceresi ---------- */
+.modal { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; animation: fade .15s; }
+.modal-box { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.modal-box h3 { margin: 0 0 4px; }
+.modal-box .muted { margin: 0 0 12px; }
+#notMetni { min-height: 280px; resize: vertical; font-family: var(--mono); font-size: .92rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+.app-footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 16px; border-top: 1px solid var(--border); }
+
+/* ---------- SweetAlert teması ---------- */
+.swal2-popup { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
+.swal2-title, .swal2-html-container, .swal2-input-label { color: var(--text) !important; }
+.swal2-input, .swal2-textarea, .swal2-file {
+  background: var(--surface-2) !important; color: var(--text) !important;
+  border: 1px solid var(--border) !important; border-radius: var(--radius-sm) !important; box-shadow: none !important;
+}
+.swal2-input:focus, .swal2-textarea:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; }
+.swal2-input:disabled { opacity: .7; }
+.swal2-styled.swal2-confirm { background: var(--accent) !important; }
+.swal2-styled.swal2-cancel { background: var(--surface-2) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+.swal2-styled.swal2-deny { background: var(--danger) !important; }
+.swal2-styled:focus { box-shadow: 0 0 0 3px var(--accent-soft) !important; }
+.swal2-validation-message { background: var(--surface-2) !important; color: var(--text) !important; }
+.swal2-timer-progress-bar { background: var(--accent) !important; }
+.swal2-close:hover { color: var(--danger) !important; }
+.ayar-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.ayar-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-weight: 600; text-align: left; transition: border-color .15s;
+}
+.ayar-btn:hover { border-color: var(--accent); }
+.ayar-btn.tehlike { color: var(--danger); }
+.ayar-btn.tehlike:hover { border-color: var(--danger); }
+.swal-uyari { color: var(--warn); font-weight: 600; }
+.yardim-liste { text-align: left; padding-left: 20px; margin: 0; }
+.yardim-liste li { margin-bottom: 8px; }
+.yardim-liste code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; font-family: var(--mono); font-size: .88em; }
+
+@keyframes giris { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 480px) {
+  .app { padding: 12px 12px 24px; }
+  .card { padding: 16px; }
+  .login { margin-top: 12vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<main class="app">
+
+  <!-- ================= GİRİŞ ================= -->
+  <section id="loginSection" class="card login" hidden>
+    <button type="button" class="icon-btn tema-btn tema-kose" title="Temayı değiştir" aria-label="Temayı değiştir">🌙</button>
+    <img src="lock.png" alt="" class="login-logo">
+    <h1>Note's</h1>
+    <p class="muted small" style="margin:4px 0 0;">Kişisel not ve şifre kasası</p>
+
+    <form id="loginForm" autocomplete="on" novalidate>
+      <div>
+        <label class="lbl" for="emailInput">E-posta</label>
+        <input class="field" type="email" id="emailInput" autocomplete="username" placeholder="ornek@mail.com">
+      </div>
+      <div>
+        <label class="lbl" for="passwordInput">Şifre</label>
+        <div class="pw">
+          <input class="field" type="password" id="passwordInput" autocomplete="current-password" placeholder="••••••••">
+          <button type="button" class="pw-btn toggle-password" data-target="passwordInput" title="Şifreyi göster" aria-label="Şifreyi göster">🐵</button>
+        </div>
+      </div>
+      <button type="submit" id="girisBtn" class="btn primary block">Giriş Yap</button>
+    </form>
+
+    <button type="button" class="link-btn" id="sifremiUnuttumBtn">Şifremi Unuttum</button>
+  </section>
+
+  <!-- ================= UYGULAMA ================= -->
+  <section id="appSection" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <img src="lock.png" alt="">
+        <div class="brand-yazi">
+          <div class="brand-ad">Note's</div>
+          <div class="brand-alt" id="hosgeldinYazi"></div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="icon-btn tema-btn" title="Temayı değiştir" aria-label="Temayı değiştir">🌙</button>
+        <div class="dropdown">
+          <button type="button" class="icon-btn dropdown-btn" id="menuBtn" title="Menü" aria-label="Menü" aria-haspopup="true" aria-expanded="false">☰</button>
+          <div class="dropdown-content" id="menuIcerik" role="menu">
+            <button type="button" data-menu="not" role="menuitem">📝 Not defteri</button>
+            <button type="button" data-menu="ayarlar" role="menuitem">⚙️ Ayarlar</button>
+            <button type="button" data-menu="yardim" role="menuitem">❓ Yardım</button>
+            <button type="button" data-menu="iletisim" role="menuitem">📩 İletişim</button>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="cikisBtn" title="Çıkış yap" aria-label="Çıkış yap">🔓</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="search">
+        <span class="search-ikon">🔍</span>
+        <input class="field" type="text" id="kelimeBul" placeholder="Kayıtlarda ara…  (Ctrl+K)" autocomplete="off">
+        <button type="button" class="temizleBtn" id="temizleBtn" title="Temizle" aria-label="Aramayı temizle" hidden>✕</button>
+      </div>
+      <button type="button" class="icon-btn" id="gizlilikBtn" title="Hassas bilgileri gizle/göster">🙈</button>
+      <button type="button" class="icon-btn" id="notEkleBtn" title="Not defteri">📝</button>
+    </div>
+
+    <section class="card form-card" id="formKart">
+      <h2 id="formBaslik">➕ Yeni kayıt</h2>
+      <div class="stack">
+        <input class="field" type="text" id="isimInput" placeholder="Başlık (ör. Gmail)" autocomplete="off">
+        <input class="field" type="text" id="soyadInput" placeholder="Kullanıcı adı / e-posta" autocomplete="off">
+        <div class="pw">
+          <input class="field" type="text" id="telefonInput" placeholder="Şifre / not" autocomplete="off" spellcheck="false">
+          <button type="button" class="pw-btn" id="sifreUretBtn" title="Güçlü şifre üret" aria-label="Güçlü şifre üret">🎲</button>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="kaydetBtn" class="btn primary">➕ Kaydet</button>
+          <button type="button" id="vazgecBtn" class="btn ghost" hidden>✖ Vazgeç</button>
+        </div>
+      </div>
+    </section>
+
+    <h3 class="list-title">✍️ Kayıtlar <span class="badge" id="notSayisi">0</span></h3>
+    <ul id="isimlerListesi" class="list"></ul>
+    <p id="bosMesaj" class="empty" hidden></p>
+  </section>
+</main>
+
+<!-- ================= NOT DEFTERİ ================= -->
+<div id="notModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="notModalBaslik">
+  <div class="modal-box">
+    <h3 id="notModalBaslik">📝 Not defteri</h3>
+    <p class="muted small">Tek, serbest bir not alanı. Kaydetmek için Ctrl+S.</p>
+    <textarea id="notMetni" class="field" placeholder="Notlarınızı buraya yazın…" spellcheck="false"></textarea>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="notIptalBtn">İptal</button>
+      <button type="button" class="btn primary" id="notKaydetBtn">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<footer class="app-footer" id="appFooter" hidden>
+  Note's · Sürüm 2.0.0 · © 2025
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+'use strict';
+
+/* =========================================================
+   AYARLAR
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyBWj53RpZd_xcWGD-ZLIyXBYz8H9MehM7Y",
+  authDomain: "dosya01-7a585.firebaseapp.com",
+  databaseURL: "https://dosya01-7a585-default-rtdb.firebaseio.com",
+  projectId: "dosya01-7a585",
+  storageBucket: "dosya01-7a585.firebasestorage.app",
+  messagingSenderId: "502419176600",
+  appId: "1:502419176600:web:d4304f2a0bfc30d03ce4ed"
+};
+const GOOGLE_CLIENT_ID = "344034966705-8paqve5db6002isrh7ahjk6s2e1ps4ob.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const EMAILJS_KEY = "VCwxBwdvT-HFnnKZ0";
+
+const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 dk hareketsizlikte çıkış
+const WARNING_TIME = 30 * 1000;        // çıkıştan 30 sn önce uyarı
+
+const THEME_KEY = 'notes-tema';
+const PRIV_KEY = 'notes-gizli';
+
+/* =========================================================
+   BAŞLATMA
+   ========================================================= */
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+if (window.emailjs) emailjs.init(EMAILJS_KEY);
+
+const $ = (id) => document.getElementById(id);
+
+let kayitRef = null;
+let kayitlar = [];
+let currentEditKey = null;
+
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'bottom-end',
+  showConfirmButton: false,
+  timer: 1800,
+  timerProgressBar: true
+});
+
+function hata(title, text) {
+  return Swal.fire({ icon: 'error', title, text, confirmButtonText: 'Tamam' });
+}
+
+function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+/* =========================================================
+   TEMA
+   ========================================================= */
+function temaUygula(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.querySelectorAll('.tema-btn').forEach(b => {
+    b.textContent = t === 'dark' ? '☀️' : '🌙';
+    b.title = t === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç';
+  });
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = t === 'dark' ? '#12131b' : '#f2f4f9';
+}
+temaUygula(document.documentElement.getAttribute('data-theme') || 'dark');
+
+document.querySelectorAll('.tema-btn').forEach(b => b.addEventListener('click', () => {
+  const yeni = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  temaUygula(yeni);
+  storeSet(THEME_KEY, yeni);
+}));
+
+if (window.matchMedia) {
+  const mq = matchMedia('(prefers-color-scheme: dark)');
+  const sistemDegisti = (e) => {
+    const kayitli = storeGet(THEME_KEY);
+    if (kayitli !== 'light' && kayitli !== 'dark') temaUygula(e.matches ? 'dark' : 'light');
+  };
+  if (mq.addEventListener) mq.addEventListener('change', sistemDegisti);
+}
+
+/* =========================================================
+   GİZLİLİK MODU (şifreleri bulanıklaştır)
+   ========================================================= */
+function gizlilikUygula(acik) {
+  document.body.classList.toggle('gizli-mod', acik);
+  const b = $('gizlilikBtn');
+  b.textContent = acik ? '🙈' : '👁️';
+  b.classList.toggle('aktif', acik);
+  b.title = acik ? 'Gizlilik modu açık — göstermek için tıklayın' : 'Gizlilik modu kapalı — gizlemek için tıklayın';
+}
+gizlilikUygula(storeGet(PRIV_KEY) !== '0');
+$('gizlilikBtn').addEventListener('click', () => {
+  const acik = !document.body.classList.contains('gizli-mod');
+  gizlilikUygula(acik);
+  storeSet(PRIV_KEY, acik ? '1' : '0');
+  document.querySelectorAll('.gizlenebilir.acik').forEach(s => s.classList.remove('acik'));
+});
+
+/* =========================================================
+   HATA MESAJLARI
+   ========================================================= */
+function authHataMesaji(e) {
+  const kod = (e && e.code) || '';
+  const msg = (e && e.message) || '';
+  if (msg.includes('INVALID_LOGIN_CREDENTIALS')) return 'E-posta veya şifre yanlış.';
+  const m = {
+    'auth/invalid-email': 'Geçersiz e-posta adresi.',
+    'auth/user-disabled': 'Bu hesap devre dışı bırakılmış.',
+    'auth/user-not-found': 'E-posta veya şifre yanlış.',
+    'auth/wrong-password': 'Şifre yanlış.',
+    'auth/invalid-credential': 'E-posta veya şifre yanlış.',
+    'auth/too-many-requests': 'Çok fazla başarısız deneme yapıldı. Bir süre sonra tekrar deneyin.',
+    'auth/network-request-failed': 'İnternet bağlantınızı kontrol edin.',
+    'auth/requires-recent-login': 'Güvenlik için çıkış yapıp tekrar giriş yapmanız gerekiyor.',
+    'auth/email-already-in-use': 'Bu e-posta başka bir hesapta kullanılıyor.',
+    'auth/weak-password': 'Şifre en az 6 karakter olmalı.',
+    'auth/operation-not-allowed': 'Bu işlem Firebase ayarlarında kapalı.'
+  };
+  return m[kod] || ('Bir hata oluştu: ' + msg);
+}
+
+/* =========================================================
+   GİRİŞ / ÇIKIŞ
+   ========================================================= */
+document.querySelectorAll('.toggle-password').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = $(btn.dataset.target);
+    const goster = input.type === 'password';
+    input.type = goster ? 'text' : 'password';
+    btn.textContent = goster ? '🙈' : '🐵';
+    btn.title = goster ? 'Şifreyi gizle' : 'Şifreyi göster';
+  });
+});
+
+$('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('emailInput').value.trim();
+  const sifre = $('passwordInput').value; // şifre kırpılmaz (boşluk içerebilir)
+
+  if (!email) return hata('Giriş Hatası', 'Lütfen e-posta adresinizi girin.');
+  if (!sifre) return hata('Giriş Hatası', 'Lütfen şifrenizi girin.');
+
+  const btn = $('girisBtn');
+  btn.disabled = true;
+  btn.textContent = 'Giriş yapılıyor…';
+  try {
+    // Sekme kapanınca oturum da kapanır
+    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    const cred = await auth.signInWithEmailAndPassword(email, sifre);
+    $('passwordInput').value = '';
+
+    if (!cred.user.emailVerified) {
+      const r = await Swal.fire({
+        icon: 'warning',
+        title: 'E-posta doğrulanmamış',
+        html: 'Giriş yapabilmek için e-postanıza gönderilen <strong>doğrulama bağlantısına</strong> tıklamanız gerekiyor.',
+        showCancelButton: true,
+        confirmButtonText: 'Bağlantıyı tekrar gönder',
+        cancelButtonText: 'Kapat'
+      });
+      if (r.isConfirmed) {
+        try {
+          await cred.user.sendEmailVerification();
+          Toast.fire({ icon: 'success', title: 'Doğrulama e-postası gönderildi' });
+        } catch (err) {
+          hata('Gönderilemedi', authHataMesaji(err));
+        }
+      }
+      await auth.signOut();
+    }
+  } catch (err) {
+    console.error('Giriş hatası:', err);
+    hata('Giriş Hatası', authHataMesaji(err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Giriş Yap';
+  }
+});
+
+$('sifremiUnuttumBtn').addEventListener('click', async () => {
+  const r = await Swal.fire({
+    title: 'Şifre Sıfırlama',
+    input: 'email',
+    inputLabel: 'Hesabınızın e-posta adresi',
+    inputValue: $('emailInput').value.trim(),
+    inputPlaceholder: 'E-posta adresiniz',
+    showCancelButton: true,
+    confirmButtonText: 'Bağlantı gönder',
+    cancelButtonText: 'İptal',
+    validationMessage: 'Lütfen geçerli bir e-posta adresi girin.'
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await auth.sendPasswordResetEmail(r.value);
+    Swal.fire({ icon: 'success', title: 'Bağlantı gönderildi', text: 'Hesap varsa şifre sıfırlama bağlantısı e-postanıza gönderildi. Gelen kutunuzu (ve spam klasörünü) kontrol edin.' });
+  } catch (err) {
+    hata('Hata', authHataMesaji(err));
+  }
+});
+
+$('cikisBtn').addEventListener('click', () => oturumuKapat(false));
+
+async function oturumuKapat(zamanAsimi) {
+  oturumDurdur();
+  try { await auth.signOut(); } catch (err) { console.error('Çıkış hatası:', err); }
+  if (zamanAsimi) {
+    Swal.fire({ icon: 'info', title: 'Oturum süresi doldu', text: 'Güvenliğiniz için oturumunuz kapatıldı. Lütfen tekrar giriş yapın.', confirmButtonText: 'Tamam' });
+  }
+}
+
+auth.onAuthStateChanged((user) => {
+  if (user && user.emailVerified) uygulamayiGoster(user);
+  else girisEkraniniGoster();
+});
+
+function uygulamayiGoster(user) {
+  $('loginSection').hidden = true;
+  $('appSection').hidden = false;
+  $('appFooter').hidden = false;
+  $('hosgeldinYazi').textContent = user.email;
+  verileriDinle(user.uid);
+  oturumBaslat();
+  $('kelimeBul').focus();
+}
+
+function girisEkraniniGoster() {
+  if (kayitRef) { kayitRef.off(); kayitRef = null; }
+  kayitlar = [];
+  $('isimlerListesi').replaceChildren();
+  $('kelimeBul').value = '';
+  $('temizleBtn').hidden = true;
+  formuSifirla();
+  notModalKapat();
+  menuKapat();
+  oturumDurdur();
+  $('appSection').hidden = true;
+  $('appFooter').hidden = true;
+  $('loginSection').hidden = false;
+  $('emailInput').focus();
+}
+
+/* =========================================================
+   OTURUM ZAMAN AŞIMI
+   ========================================================= */
+let sonAktivite = Date.now();
+let uyariTimer = null;
+let uyariAcik = false;
+let oturumAktif = false;
+
+function zamanlayiciKur() {
+  clearTimeout(uyariTimer);
+  uyariTimer = setTimeout(uyariGoster, SESSION_TIMEOUT - WARNING_TIME);
+}
+function oturumBaslat() {
+  oturumAktif = true;
+  uyariAcik = false;
+  sonAktivite = Date.now();
+  zamanlayiciKur();
+}
+function oturumDurdur() {
+  oturumAktif = false;
+  clearTimeout(uyariTimer);
+}
+function aktivite() {
+  if (!oturumAktif || uyariAcik) return;
+  const simdi = Date.now();
+  if (simdi - sonAktivite < 1000) return; // fare hareketlerini seyrelt
+  sonAktivite = simdi;
+  zamanlayiciKur();
+}
+['mousemove', 'keydown', 'scroll', 'click', 'touchstart'].forEach(ev =>
+  document.addEventListener(ev, aktivite, { passive: true })
+);
+// Sekme arka plandayken zamanlayıcılar yavaşlayabilir; geri dönünce kontrol et
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && oturumAktif && !uyariAcik &&
+      Date.now() - sonAktivite > SESSION_TIMEOUT) {
+    oturumuKapat(true);
+  }
+});
+
+function uyariGoster() {
+  if (!oturumAktif) return;
+  uyariAcik = true;
+  Swal.fire({
+    icon: 'warning',
+    title: 'Oturum kapanmak üzere',
+    text: `${WARNING_TIME / 1000} saniye içinde otomatik olarak çıkış yapılacak.`,
+    showCancelButton: true,
+    confirmButtonText: 'Oturumu açık tut',
+    cancelButtonText: 'Şimdi çık',
+    reverseButtons: true,
+    timer: WARNING_TIME,
+    timerProgressBar: true,
+    allowOutsideClick: false,
+    allowEscapeKey: false
+  }).then((r) => {
+    uyariAcik = false;
+    if (!oturumAktif) return;
+    if (r.isConfirmed) {
+      sonAktivite = Date.now();
+      zamanlayiciKur();
+    } else {
+      oturumuKapat(r.dismiss === Swal.DismissReason.timer);
+    }
+  });
+}
+
+/* =========================================================
+   KAYITLAR
+   ========================================================= */
+function verileriDinle(uid) {
+  if (kayitRef) kayitRef.off();
+  kayitRef = db.ref('kayitlar/' + uid);
+  kayitRef.on('value', (snap) => {
+    const v = snap.val() || {};
+    kayitlar = Object.keys(v).map(key => ({
+      key,
+      ad: (v[key] && v[key].ad) || '',
+      soyad: (v[key] && v[key].soyad) || '',
+      telefon: (v[key] && v[key].telefon) || '',
+      tarih: (v[key] && v[key].tarih) || ''
+    }));
+    kayitlar.sort((a, b) => zaman(b.tarih) - zaman(a.tarih)); // en yeni üstte
+    listeyiCiz();
+  }, (err) => {
+    console.error('Veri okuma hatası:', err);
+    hata('Veriler okunamadı', err.message);
+  });
+}
+
+function zaman(t) {
+  const n = t ? new Date(t).getTime() : 0;
+  return isNaN(n) ? 0 : n;
+}
+
+function tarihFormat(t) {
+  const n = zaman(t);
+  if (!n) return '';
+  return new Date(n).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+// **https://...** biçimindeki değerleri güvenli bağlantıya çevirir
+function ayristir(metin) {
+  const m = /^\*\*([\s\S]*?)\*\*$/.exec(metin);
+  if (!m) return { yazi: metin, link: null };
+  const icerik = m[1].trim();
+  if (/^(https?:\/\/|www\.)\S+$/i.test(icerik)) {
+    return { yazi: icerik, link: icerik.toLowerCase().startsWith('www.') ? 'https://' + icerik : icerik };
+  }
+  return { yazi: icerik, link: null };
+}
+
+function listeyiCiz() {
+  const q = $('kelimeBul').value.trim().toLocaleLowerCase('tr');
+  const filtre = q
+    ? kayitlar.filter(k => (k.ad + '\n' + k.soyad + '\n' + k.telefon).toLocaleLowerCase('tr').includes(q))
+    : kayitlar;
+
+  $('notSayisi').textContent = q ? `${filtre.length} / ${kayitlar.length}` : String(kayitlar.length);
+  $('isimlerListesi').replaceChildren(...filtre.map(kartOlustur));
+
+  const bos = $('bosMesaj');
+  if (kayitlar.length === 0) { bos.textContent = 'Henüz kayıt yok. Yukarıdaki formdan ilk kaydınızı ekleyin.'; bos.hidden = false; }
+  else if (filtre.length === 0) { bos.textContent = 'Aramanızla eşleşen kayıt bulunamadı.'; bos.hidden = false; }
+  else bos.hidden = true;
+}
+
+function kartOlustur(k) {
+  const li = el('li', 'kayit');
+  if (k.key === currentEditKey) li.classList.add('duzenleniyor');
+
+  const ust = el('div', 'kayit-ust');
+  ust.append(el('span', 'kayitZamani', tarihFormat(k.tarih) || 'Tarih yok'));
+
+  const aksiyon = el('div', 'kayit-aksiyon');
+  const duzenleBtn = el('button', 'btn ghost small', '✏️ Düzenle');
+  duzenleBtn.type = 'button';
+  duzenleBtn.addEventListener('click', () => duzenle(k));
+  const silBtn = el('button', 'btn danger small', '🗑️ Sil');
+  silBtn.type = 'button';
+  silBtn.addEventListener('click', () => sil(k));
+  aksiyon.append(duzenleBtn, silBtn);
+  ust.append(aksiyon);
+  li.append(ust);
+
+  [['ad', 'Başlık'], ['soyad', 'Kullanıcı adı'], ['telefon', 'Şifre / not']].forEach(([alan, etiket], i) => {
+    const deger = k[alan];
+    if (!deger) return;
+    const { yazi, link } = ayristir(deger);
+
+    const satir = el('div', 'bilgiSatiri' + (i === 0 ? ' baslik' : ''));
+    const kopya = el('button', 'kopyalaBtn', '⎘');
+    kopya.type = 'button';
+    kopya.title = etiket + ' kopyala';
+    kopya.setAttribute('aria-label', etiket + ' kopyala');
+    kopya.addEventListener('click', () => kopyala(yazi));
+
+    const span = el('span', 'kayit-metin' + (i > 0 ? ' gizlenebilir' : ''));
+    if (link) {
+      const a = el('a', null, yazi);
+      a.href = link;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      span.append(a);
+    } else {
+      span.textContent = yazi;
+    }
+    span.addEventListener('click', (e) => {
+      if (document.body.classList.contains('gizli-mod') && span.classList.contains('gizlenebilir') && !span.classList.contains('acik')) {
+        e.preventDefault();
+        span.classList.add('acik');
+      }
+    });
+
+    satir.append(kopya, span);
+    li.append(satir);
+  });
+
+  return li;
+}
+
+async function kaydet() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const veri = {
+    ad: $('isimInput').value.trim(),
+    soyad: $('soyadInput').value.trim(),
+    telefon: $('telefonInput').value.trim()
+  };
+  if (!veri.ad && !veri.soyad && !veri.telefon) {
+    Swal.fire({ icon: 'info', text: 'Lütfen en az bir alanı doldurun.', confirmButtonText: 'Tamam' });
+    return;
+  }
+  veri.tarih = new Date().toISOString();
+
+  const btn = $('kaydetBtn');
+  btn.disabled = true;
+  try {
+    if (currentEditKey) {
+      await db.ref(`kayitlar/${user.uid}/${currentEditKey}`).update(veri);
+      Toast.fire({ icon: 'success', title: 'Kayıt güncellendi' });
+    } else {
+      await db.ref(`kayitlar/${user.uid}`).push(veri);
+      Toast.fire({ icon: 'success', title: 'Kayıt eklendi' });
+    }
+    formuSifirla();
+  } catch (err) {
+    console.error('Kaydetme hatası:', err);
+    hata('Kaydedilemedi', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function duzenle(k) {
+  currentEditKey = k.key;
+  $('isimInput').value = k.ad;
+  $('soyadInput').value = k.soyad;
+  $('telefonInput').value = k.telefon;
+  $('formBaslik').textContent = '✏️ Kaydı düzenle';
+  $('kaydetBtn').textContent = '✔ Güncelle';
+  $('vazgecBtn').hidden = false;
+  $('formKart').classList.add('duzenleme');
+  listeyiCiz();
+  $('formKart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('isimInput').focus({ preventScroll: true });
+}
+
+function formuSifirla() {
+  currentEditKey = null;
+  $('isimInput').value = '';
+  $('soyadInput').value = '';
+  $('telefonInput').value = '';
+  $('formBaslik').textContent = '➕ Yeni kayıt';
+  $('kaydetBtn').textContent = '➕ Kaydet';
+  $('vazgecBtn').hidden = true;
+  $('formKart').classList.remove('duzenleme');
+  if (kayitlar.length) listeyiCiz();
+}
+
+async function sil(k) {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    icon: 'warning',
+    title: 'Kayıt silinsin mi?',
+    text: k.ad ? `"${k.ad}" kalıcı olarak silinecek.` : 'Bu kayıt kalıcı olarak silinecek.',
+    showCancelButton: true,
+    confirmButtonText: 'Evet, sil',
+    cancelButtonText: 'İptal',
+    confirmButtonColor: '#dc3e42',
+    reverseButtons: true
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await db.ref(`kayitlar/${user.uid}/${k.key}`).remove();
+    if (currentEditKey === k.key) formuSifirla();
+    Toast.fire({ icon: 'success', title: 'Kayıt silindi' });
+  } catch (err) {
+    console.error('Silme hatası:', err);
+    hata('Silinemedi', err.message);
+  }
+}
+
+$('kaydetBtn').addEventListener('click', kaydet);
+$('vazgecBtn').addEventListener('click', formuSifirla);
+['isimInput', 'soyadInput', 'telefonInput'].forEach(id => {
+  $(id).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); kaydet(); }
+  });
+});
+
+/* Güçlü şifre üretici */
+function sifreUret(uzunluk = 20) {
+  const set = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*-_=+?';
+  const dizi = new Uint32Array(uzunluk);
+  crypto.getRandomValues(dizi);
+  return Array.from(dizi, n => set[n % set.length]).join('');
+}
+$('sifreUretBtn').addEventListener('click', () => {
+  $('telefonInput').value = sifreUret();
+  Toast.fire({ icon: 'success', title: 'Güçlü şifre üretildi' });
+});
+
+/* Kopyalama */
+async function kopyala(metin) {
+  if (!metin) return;
+  try {
+    await navigator.clipboard.writeText(metin);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = metin;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  Toast.fire({ icon: 'success', title: 'Kopyalandı' });
+}
+
+/* Arama */
+$('kelimeBul').addEventListener('input', () => {
+  $('temizleBtn').hidden = $('kelimeBul').value === '';
+  listeyiCiz();
+});
+$('temizleBtn').addEventListener('click', () => {
+  $('kelimeBul').value = '';
+  $('temizleBtn').hidden = true;
+  listeyiCiz();
+  $('kelimeBul').focus();
+});
+
+/* =========================================================
+   NOT DEFTERİ
+   ========================================================= */
+async function notModalAc() {
+  const user = auth.currentUser;
+  if (!user) return;
+  menuKapat();
+  const ta = $('notMetni');
+  $('notModal').hidden = false;
+  ta.value = 'Yükleniyor…';
+  ta.disabled = true;
+  try {
+    const snap = await db.ref(`notlar/${user.uid}/not`).once('value');
+    const data = snap.val();
+    ta.value = (data && data.metin) || '';
+  } catch (err) {
+    ta.value = '';
+    hata('Not getirilemedi', err.message);
+  } finally {
+    ta.disabled = false;
+    ta.focus();
+  }
+}
+
+function notModalKapat() {
+  $('notModal').hidden = true;
+  $('notMetni').value = '';
+}
+
+async function notKaydet() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const btn = $('notKaydetBtn');
+  btn.disabled = true;
+  try {
+    await db.ref(`notlar/${user.uid}/not`).set({
+      metin: $('notMetni').value,
+      tarih: new Date().toISOString()
+    });
+    notModalKapat();
+    Toast.fire({ icon: 'success', title: 'Not kaydedildi' });
+  } catch (err) {
+    console.error('Not kaydetme hatası:', err);
+    hata('Not kaydedilemedi', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('notEkleBtn').addEventListener('click', notModalAc);
+$('notIptalBtn').addEventListener('click', notModalKapat);
+$('notKaydetBtn').addEventListener('click', notKaydet);
+
+/* =========================================================
+   MENÜ
+   ========================================================= */
+function menuKapat() {
+  $('menuIcerik').classList.remove('show');
+  $('menuBtn').setAttribute('aria-expanded', 'false');
+}
+$('menuBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const acik = $('menuIcerik').classList.toggle('show');
+  $('menuBtn').setAttribute('aria-expanded', String(acik));
+});
+window.addEventListener('click', (e) => {
+  if (!e.target.closest('.dropdown')) menuKapat();
+});
+$('menuIcerik').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-menu]');
+  if (!b) return;
+  menuKapat();
+  ({ not: notModalAc, ayarlar: ayarlariAc, yardim: yardimGoster, iletisim: iletisimFormuGoster })[b.dataset.menu]();
+});
+
+/* Klavye kısayolları */
+document.addEventListener('keydown', (e) => {
+  const notAcik = !$('notModal').hidden;
+  if (e.key === 'Escape') {
+    if (notAcik) { notModalKapat(); return; }
+    menuKapat();
+    if (currentEditKey && !Swal.isVisible()) formuSifirla();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && notAcik) {
+    e.preventDefault();
+    notKaydet();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !$('appSection').hidden) {
+    e.preventDefault();
+    $('kelimeBul').focus();
+    $('kelimeBul').select();
+  }
+});
+
+/* =========================================================
+   AYARLAR
+   ========================================================= */
+function ayarlariAc() {
+  gsiOnYukle().catch(() => {}); // Drive için Google kütüphanesini arka planda hazırla
+  Swal.fire({
+    title: '⚙️ Ayarlar',
+    html: `
+      <div class="ayar-grid">
+        <button type="button" class="ayar-btn" data-islem="indir">⬇️ Yedeği indir (.json)</button>
+        <button type="button" class="ayar-btn" data-islem="yukle">⬆️ Yedekten geri yükle</button>
+        <button type="button" class="ayar-btn" data-islem="drive">☁️ Google Drive’a yedekle</button>
+        <button type="button" class="ayar-btn" data-islem="sifre">🔒 Şifre değiştir</button>
+        <button type="button" class="ayar-btn" data-islem="email">📧 E-posta değiştir</button>
+        <button type="button" class="ayar-btn tehlike" data-islem="hesapSil">🗑️ Hesabı sil</button>
+      </div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    didOpen: (popup) => {
+      const islemler = {
+        indir: notlariIndir,
+        yukle: notlariYukle,
+        drive: yedekleDrive,
+        sifre: degistirSifre,
+        email: degistirEmail,
+        hesapSil: hesapSil
+      };
+      popup.querySelectorAll('[data-islem]').forEach(b => b.addEventListener('click', () => {
+        Swal.close();
+        islemler[b.dataset.islem]();
+      }));
+    }
+  });
+}
+
+async function yedekVerisi() {
+  const uid = auth.currentUser.uid;
+  const [notSnap, kayitSnap] = await Promise.all([
+    db.ref(`notlar/${uid}/not`).once('value'),
+    db.ref(`kayitlar/${uid}`).once('value')
+  ]);
+  return {
+    notlar: notSnap.val() || {},
+    kayitlar: kayitSnap.val() || {},
+    olusturulma: new Date().toISOString()
+  };
+}
+
+function yedekDosyaAdi() {
+  return `notes_yedek_${new Date().toISOString().slice(0, 10)}.json`;
+}
+
+async function notlariIndir() {
+  if (!auth.currentUser) return;
+  try {
+    const data = await yedekVerisi();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = yedekDosyaAdi();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Swal.fire({ icon: 'success', title: 'Yedek indirildi', text: 'Dosya şifrelenmemiştir; güvenli bir yerde saklayın.' });
+  } catch (err) {
+    console.error('İndirme hatası:', err);
+    hata('İndirilemedi', err.message);
+  }
+}
+
+const GECERSIZ_ANAHTAR = /[.#$\[\]\/]/;
+
+async function notlariYukle() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const { value: dosya } = await Swal.fire({
+    title: '⬆️ Yedekten geri yükle',
+    html: '<p class="swal-uyari">Mevcut tüm kayıtlarınız ve notunuz dosyadakilerle değiştirilecek.</p>',
+    input: 'file',
+    inputAttributes: { accept: '.json,application/json' },
+    showCancelButton: true,
+    confirmButtonText: 'Devam',
+    cancelButtonText: 'İptal',
+    inputValidator: (f) => !f && 'Lütfen bir dosya seçin.'
+  });
+  if (!dosya) return;
+
+  let data;
+  try {
+    data = JSON.parse(await dosya.text());
+  } catch (e) {
+    return hata('Hatalı dosya', 'Seçilen dosya geçerli bir JSON değil.');
+  }
+  if (!data || typeof data !== 'object' || (!data.kayitlar && !data.notlar)) {
+    return hata('Hatalı dosya', 'Bu dosya bir Note\'s yedeği gibi görünmüyor.');
+  }
+
+  const temizKayitlar = {};
+  if (data.kayitlar && typeof data.kayitlar === 'object') {
+    for (const [key, v] of Object.entries(data.kayitlar)) {
+      if (!v || typeof v !== 'object' || GECERSIZ_ANAHTAR.test(key)) continue;
+      temizKayitlar[key] = {
+        ad: String(v.ad || ''),
+        soyad: String(v.soyad || ''),
+        telefon: String(v.telefon || ''),
+        tarih: String(v.tarih || new Date().toISOString())
+      };
+    }
+  }
+  const not = (data.notlar && typeof data.notlar.metin === 'string')
+    ? { metin: data.notlar.metin, tarih: String(data.notlar.tarih || new Date().toISOString()) }
+    : null;
+
+  const adet = Object.keys(temizKayitlar).length;
+  const onay = await Swal.fire({
+    icon: 'warning',
+    title: 'Emin misiniz?',
+    text: `${adet} kayıt${not ? ' ve not defteri' : ''} yüklenecek. Mevcut veriler silinecek.`,
+    showCancelButton: true,
+    confirmButtonText: 'Evet, yükle',
+    cancelButtonText: 'İptal',
+    reverseButtons: true
+  });
+  if (!onay.isConfirmed) return;
+
+  try {
+    const isler = [db.ref(`kayitlar/${user.uid}`).set(temizKayitlar)];
+    if (not) isler.push(db.ref(`notlar/${user.uid}/not`).set(not));
+    await Promise.all(isler);
+    Swal.fire({ icon: 'success', title: 'Veriler yüklendi', text: `${adet} kayıt geri yüklendi.` });
+  } catch (err) {
+    console.error('Yükleme hatası:', err);
+    hata('Yüklenemedi', err.message);
+  }
+}
+
+/* ---------- Google Drive (Google Identity Services) ---------- */
+let gsiYukleniyor = null;
+function gsiOnYukle() {
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  if (!gsiYukleniyor) {
+    gsiYukleniyor = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = () => { gsiYukleniyor = null; reject(new Error('Google kütüphanesi yüklenemedi.')); };
+      document.head.appendChild(s);
+    });
+  }
+  return gsiYukleniyor;
+}
+
+function yedekleDrive() {
+  if (!auth.currentUser) return;
+  if (!(window.google && google.accounts && google.accounts.oauth2)) {
+    Swal.fire({ title: 'Google bağlantısı hazırlanıyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    gsiOnYukle()
+      .then(() => Swal.fire({ icon: 'info', text: 'Hazır. Lütfen "Google Drive’a yedekle" seçeneğine tekrar tıklayın.' }))
+      .catch(err => hata('Google', err.message));
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: (resp) => {
+      if (resp.error) return hata('Google', 'Yetki alınamadı: ' + resp.error);
+      driveYukle(resp.access_token);
+    },
+    error_callback: (err) => {
+      if (err && err.type === 'popup_closed') return;
+      hata('Google', 'Google hesabına bağlanılamadı' + (err && err.type ? ` (${err.type})` : '') + '.');
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function driveYukle(token) {
+  Swal.fire({ title: 'Drive’a yükleniyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try {
+    const data = await yedekVerisi();
+    const metadata = { name: yedekDosyaAdi(), mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: form
+    });
+    if (!res.ok) throw new Error('Google API yanıtı: ' + res.status);
+    Swal.fire({ icon: 'success', title: 'Google Drive’a yedeklendi', text: metadata.name });
+  } catch (err) {
+    console.error('Drive hatası:', err);
+    hata('Drive’a yüklenemedi', err.message);
+  }
+}
+
+/* ---------- Hesap işlemleri ---------- */
+function yenidenDogrula(user, sifre) {
+  const cred = firebase.auth.EmailAuthProvider.credential(user.email, sifre);
+  return user.reauthenticateWithCredential(cred);
+}
+
+async function degistirSifre() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    title: '🔒 Şifre değiştir',
+    html: `
+      <input type="password" id="mevcutSifreInput" class="swal2-input" placeholder="Mevcut şifre" autocomplete="current-password">
+      <input type="password" id="yeniSifreInput" class="swal2-input" placeholder="Yeni şifre" autocomplete="new-password">
+      <input type="password" id="yeniSifreTekrarInput" class="swal2-input" placeholder="Yeni şifre (tekrar)" autocomplete="new-password">`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Değiştir',
+    cancelButtonText: 'İptal',
+    preConfirm: () => {
+      const mevcut = $('mevcutSifreInput').value;
+      const yeni = $('yeniSifreInput').value;
+      const tekrar = $('yeniSifreTekrarInput').value;
+      if (!mevcut || !yeni || !tekrar) return Swal.showValidationMessage('Tüm alanları doldurun.');
+      if (yeni.length < 6) return Swal.showValidationMessage('Yeni şifre en az 6 karakter olmalı.');
+      if (yeni !== tekrar) return Swal.showValidationMessage('Yeni şifreler eşleşmiyor.');
+      if (yeni === mevcut) return Swal.showValidationMessage('Yeni şifre mevcut şifreyle aynı olamaz.');
+      return { mevcut, yeni };
+    }
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await yenidenDogrula(user, r.value.mevcut);
+    await user.updatePassword(r.value.yeni);
+    Swal.fire({ icon: 'success', title: 'Şifre değiştirildi' });
+  } catch (err) {
+    console.error('Şifre değiştirme hatası:', err);
+    hata('Şifre değiştirilemedi', authHataMesaji(err));
+  }
+}
+
+async function degistirEmail() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    title: '📧 E-posta değiştir',
+    html: `
+      <input id="swal-old-email" class="swal2-input" type="email" disabled>
+      <input id="swal-new-email" class="swal2-input" type="email" placeholder="Yeni e-posta adresi" autocomplete="off">
+      <input id="swal-password" class="swal2-input" type="password" placeholder="Mevcut şifreniz" autocomplete="current-password">`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Doğrulama gönder',
+    cancelButtonText: 'İptal',
+    didOpen: () => { $('swal-old-email').value = user.email || ''; },
+    preConfirm: () => {
+      const yeni = $('swal-new-email').value.trim();
+      const sifre = $('swal-password').value;
+      if (!yeni || !sifre) return Swal.showValidationMessage('Tüm alanları doldurun.');
+      if (!/^\S+@\S+\.\S+$/.test(yeni)) return Swal.showValidationMessage('Geçerli bir e-posta adresi girin.');
+      if (yeni.toLowerCase() === (user.email || '').toLowerCase()) return Swal.showValidationMessage('Yeni adres mevcut adresle aynı.');
+      return { yeni, sifre };
+    }
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await yenidenDogrula(user, r.value.sifre);
+    // Firebase artık e-postayı doğrudan değiştirmeye izin vermiyor; önce yeni adres doğrulanmalı
+    await user.verifyBeforeUpdateEmail(r.value.yeni);
+    Swal.fire({
+      icon: 'success',
+      title: 'Doğrulama bağlantısı gönderildi',
+      html: `<strong>${r.value.yeni.replace(/[<>&"]/g, '')}</strong> adresine gelen bağlantıya tıkladığınızda e-postanız değişecek. Ardından yeni adresle tekrar giriş yapmanız gerekecek.`
+    });
+  } catch (err) {
+    console.error('E-posta değiştirme hatası:', err);
+    hata('E-posta değiştirilemedi', authHataMesaji(err));
+  }
+}
+
+async function hesapSil() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    icon: 'warning',
+    title: 'Hesap kalıcı olarak silinsin mi?',
+    html: `
+      <p class="swal-uyari">Bu işlem geri alınamaz! Tüm kayıtlarınız ve notunuz silinecek.</p>
+      <input type="password" id="hesapSilSifre" class="swal2-input" placeholder="Şifreniz" autocomplete="current-password">
+      <input type="text" id="hesapSilOnay" class="swal2-input" placeholder='Onay için "SİL" yazın' autocomplete="off">`,
+    showCancelButton: true,
+    confirmButtonColor: '#dc3e42',
+    confirmButtonText: 'Hesabı sil',
+    cancelButtonText: 'Vazgeç',
+    reverseButtons: true,
+    focusConfirm: false,
+    preConfirm: () => {
+      const sifre = $('hesapSilSifre').value;
+      const onay = $('hesapSilOnay').value.trim().toLocaleUpperCase('tr');
+      if (!sifre) return Swal.showValidationMessage('Şifrenizi girin.');
+      if (onay !== 'SİL') return Swal.showValidationMessage('Onay için "SİL" yazın.');
+      return sifre;
+    }
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await yenidenDogrula(user, r.value);
+    if (kayitRef) { kayitRef.off(); kayitRef = null; }
+    await db.ref(`notlar/${user.uid}`).remove();
+    await db.ref(`kayitlar/${user.uid}`).remove();
+    await user.delete();
+    Swal.fire({ icon: 'success', title: 'Hesap silindi', text: 'Hesabınız ve tüm verileriniz silindi.' });
+  } catch (err) {
+    console.error('Hesap silme hatası:', err);
+    hata('Hesap silinemedi', authHataMesaji(err));
+  }
+}
+
+/* =========================================================
+   YARDIM & İLETİŞİM
+   ========================================================= */
+function yardimGoster() {
+  Swal.fire({
+    title: '❓ Yardım',
+    html: `
+      <ul class="yardim-liste">
+        <li>Her kayıtta 3 alan var: <b>başlık</b>, <b>kullanıcı adı</b> ve <b>şifre/not</b>. En az birini doldurmanız yeterli.</li>
+        <li>Bir alana <code>**https://site.com**</code> yazarsanız tıklanabilir bağlantıya dönüşür.</li>
+        <li>🙈 <b>Gizlilik modu</b> açıkken şifreler bulanık görünür; görmek için üzerine tıklayın. ⎘ ile doğrudan kopyalayabilirsiniz.</li>
+        <li>🎲 düğmesi 20 karakterlik güçlü bir şifre üretir.</li>
+        <li>Kısayollar: <code>Ctrl+K</code> arama, <code>Enter</code> kaydet, <code>Esc</code> düzenlemeyi iptal, not defterinde <code>Ctrl+S</code> kaydet.</li>
+        <li>${SESSION_TIMEOUT / 60000} dakika işlem yapmazsanız oturum otomatik kapanır. Sekmeyi kapatınca da oturum kapanır.</li>
+      </ul>`,
+    confirmButtonText: 'Tamam'
+  });
+}
+
+async function iletisimFormuGoster() {
+  const r = await Swal.fire({
+    title: '📩 İletişim',
+    html: `
+      <input id="swal-ad" class="swal2-input" placeholder="Adınız">
+      <input id="swal-email" class="swal2-input" type="email" placeholder="E-posta">
+      <textarea id="swal-mesaj" class="swal2-textarea" placeholder="Mesajınız…"></textarea>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Gönder',
+    cancelButtonText: 'İptal',
+    preConfirm: () => {
+      const mesaj = $('swal-mesaj').value.trim();
+      if (!mesaj) return Swal.showValidationMessage('Lütfen bir mesaj yazın.');
+      return { ad: $('swal-ad').value.trim(), email: $('swal-email').value.trim(), mesaj };
+    }
+  });
+  if (!r.isConfirmed) return;
+  if (!window.emailjs) return hata('Hata', 'E-posta servisi yüklenemedi.');
+  try {
+    await emailjs.send('service_8ofb079', 'template_80rg1o1', {
+      name: r.value.ad,
+      email: r.value.email,
+      message: r.value.mesaj,
+      time: new Date().toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    });
+    Swal.fire({ icon: 'success', title: 'Mesajınız gönderildi' });
+  } catch (err) {
+    hata('Mesaj gönderilemedi', (err && err.text) || 'Bilinmeyen hata');
+  }
+}
+</script>
+</body>
+</html>

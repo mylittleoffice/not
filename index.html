@@ -1,0 +1,2303 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#12131b">
+
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://accounts.google.com https://*.firebaseio.com;
+  style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://accounts.google.com;
+  img-src 'self' data:;
+  connect-src 'self' https://www.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://api.emailjs.com;
+  frame-src 'self' https://accounts.google.com https://*.firebaseio.com https://*.firebaseapp.com;
+  font-src 'self' data:;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+">
+
+<!-- Tema, sayfa çizilmeden önce uygulanır (yanıp sönmeyi önler) -->
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('notes-tema'); } catch (e) {}
+  if (t !== 'light' && t !== 'dark') {
+    t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+<title>Note's</title>
+<link rel="icon" href="lock.png" type="image/png">
+
+<style>
+:root {
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+  --star: #f5a524;
+}
+:root, [data-theme="light"] {
+  --bg: #f2f4f9;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --border: #dde2ec;
+  --text: #1b1e2b;
+  --muted: #646b85;
+  --accent: #2f6fed;
+  --accent-hover: #2459c7;
+  --accent-soft: rgba(47, 111, 237, .12);
+  --danger: #dc3e42;
+  --danger-soft: rgba(220, 62, 66, .10);
+  --warn: #d97a00;
+  --warn-soft: rgba(245, 165, 36, .14);
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 8px 24px rgba(16, 24, 40, .06);
+  --overlay: rgba(15, 18, 30, .45);
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: #12131b;
+  --surface: #1b1d29;
+  --surface-2: #242736;
+  --border: #30344a;
+  --text: #e7e9f3;
+  --muted: #9499b3;
+  --accent: #5b93ff;
+  --accent-hover: #79a7ff;
+  --accent-soft: rgba(91, 147, 255, .15);
+  --danger: #f0585d;
+  --danger-soft: rgba(240, 88, 93, .14);
+  --warn: #f5a524;
+  --warn-soft: rgba(245, 165, 36, .12);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+  --overlay: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background-color .25s, color .25s;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+
+.app { width: 100%; max-width: 640px; margin: 0 auto; padding: 16px 16px 32px; flex: 1; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  transition: background-color .25s, border-color .25s;
+}
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+
+/* ---------- Form elemanları ---------- */
+.field {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s, background-color .25s;
+}
+.field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field::placeholder { color: var(--muted); }
+.field:disabled { opacity: .6; }
+/* Tarayıcı "şifre kaydedilsin mi?" sormasın diye şifre alanları type=text + maske */
+.maskeli { -webkit-text-security: disc; text-security: disc; font-family: var(--mono); letter-spacing: .08em; }
+.maskeli::placeholder { letter-spacing: normal; }
+.lbl { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: 600;
+  transition: background-color .15s, border-color .15s, color .15s, transform .05s;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn.danger { background: var(--danger-soft); color: var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+.btn.small { padding: 6px 12px; font-size: .85rem; }
+.btn.block { width: 100%; }
+
+.icon-btn {
+  flex: none;
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 18px;
+  transition: background-color .15s, border-color .15s;
+}
+.icon-btn:hover { background: var(--surface-2); border-color: var(--accent); }
+.icon-btn.aktif { background: var(--accent-soft); border-color: var(--accent); }
+.icon-btn.sm { width: 36px; height: 36px; font-size: 15px; }
+
+.pw { position: relative; }
+.pw .field { padding-right: 50px; }
+.pw-btn {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  width: 38px; height: 38px;
+  border: none; background: transparent; border-radius: 8px;
+  font-size: 18px; color: var(--muted);
+}
+.pw-btn:hover { background: var(--surface); }
+
+/* ---------- Giriş & kilit ---------- */
+.login { max-width: 400px; margin: 9vh auto 0; text-align: center; padding: 32px 24px; }
+.login-logo { width: 64px; height: 64px; margin-bottom: 6px; }
+.login h1 { margin: 0; font-size: 1.6rem; letter-spacing: -.01em; }
+.login form { display: flex; flex-direction: column; gap: 14px; margin-top: 24px; text-align: left; }
+.link-btn { background: none; border: none; color: var(--accent); padding: 8px; margin-top: 10px; font-weight: 600; }
+.link-btn:hover { text-decoration: underline; }
+.tema-kose { position: fixed; top: 16px; right: 16px; }
+.uyari-kutu {
+  background: var(--warn-soft); border: 1px solid rgba(245, 165, 36, .45);
+  border-radius: var(--radius-sm); padding: 10px 12px; font-size: .85rem; line-height: 1.45;
+}
+.kilit-durum { margin-top: 24px; }
+
+/* ---------- Üst çubuk ---------- */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 8px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand img { width: 34px; height: 34px; flex: none; }
+.brand-yazi { min-width: 0; }
+.brand-ad { font-weight: 800; font-size: 1.2rem; line-height: 1.1; }
+.brand-alt { font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-actions { display: flex; gap: 8px; align-items: center; }
+
+.toolbar {
+  display: flex; gap: 8px;
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: 10px 0;
+  margin-bottom: 8px;
+  transition: background-color .25s;
+}
+.search { position: relative; flex: 1; min-width: 0; }
+.search .field { padding-left: 40px; padding-right: 44px; height: 44px; }
+.search-ikon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 15px; }
+.temizleBtn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: none; background: transparent; color: var(--muted); border-radius: 8px; }
+.temizleBtn:hover { background: var(--surface); color: var(--text); }
+
+/* ---------- Kayıt formu ---------- */
+.form-card { transition: border-color .2s, box-shadow .2s; }
+.form-card.duzenleme { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.form-card h2 { margin: 0 0 12px; font-size: 1rem; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.form-actions { display: flex; gap: 8px; margin-top: 4px; }
+.form-actions .btn { flex: 1; }
+
+/* ---------- Filtreler ---------- */
+.list-title { display: flex; align-items: center; gap: 8px; margin: 26px 0 10px; font-size: 1rem; }
+.badge { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 10px; font-size: .8rem; font-weight: 700; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 999px; padding: 5px 12px; font-size: .85rem; font-weight: 600;
+  transition: background-color .15s, border-color .15s;
+}
+.chip:hover { border-color: var(--accent); }
+.chip .n { color: var(--muted); font-weight: 500; margin-left: 6px; }
+.chip.aktif { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.aktif .n { color: rgba(255, 255, 255, .8); }
+
+/* ---------- Liste ---------- */
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.kayit {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow);
+  transition: border-color .15s, background-color .25s;
+  animation: giris .2s ease;
+}
+.kayit:hover { border-color: var(--accent); }
+.kayit.favori { border-left: 4px solid var(--star); }
+.kayit.duzenleniyor { border-color: var(--warn); }
+.kayit-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.kayit-meta { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.kat-rozet {
+  border: none; font-size: .72rem; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.kat-rozet:hover { background: var(--accent); color: #fff; }
+.kayitZamani { font-size: .75rem; color: var(--muted); }
+.kayit-aksiyon { display: flex; gap: 6px; flex: none; }
+.mini-btn {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); font-size: 14px;
+  transition: border-color .15s, background-color .15s, color .15s;
+}
+.mini-btn:hover { border-color: var(--accent); }
+.mini-btn.sil:hover { border-color: var(--danger); background: var(--danger-soft); }
+.mini-btn.yildiz { font-size: 17px; color: var(--muted); }
+.mini-btn.yildiz.aktif { color: var(--star); border-color: rgba(245, 165, 36, .55); }
+.bilgiSatiri { display: flex; align-items: flex-start; gap: 8px; }
+.kopyalaBtn {
+  flex: none; width: 30px; height: 30px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+  font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+  transition: color .15s, border-color .15s;
+}
+.kopyalaBtn:hover { color: var(--accent); border-color: var(--accent); }
+.kayit-metin {
+  flex: 1; min-width: 0;
+  word-break: break-word; white-space: pre-wrap;
+  padding-top: 3px;
+  font-family: var(--mono); font-size: .92rem;
+}
+.bilgiSatiri.baslik .kayit-metin { font-family: var(--font); font-weight: 700; font-size: 1rem; }
+.gizli-mod .gizlenebilir:not(.acik) { filter: blur(6px); cursor: pointer; user-select: none; }
+.kayit-metin a { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.bozuk-yazi { color: var(--danger); font-size: .9rem; }
+.empty { text-align: center; color: var(--muted); padding: 32px 16px; border: 1px dashed var(--border); border-radius: var(--radius); }
+
+/* ---------- Menü ---------- */
+.dropdown { position: relative; }
+.dropdown-content {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  min-width: 200px; padding: 6px; z-index: 20;
+  display: none;
+}
+.dropdown-content.show { display: block; animation: fade .12s; }
+.dropdown-content button {
+  display: flex; width: 100%; gap: 10px; align-items: center;
+  padding: 10px 12px; border: none; background: none; color: var(--text);
+  border-radius: 8px; text-align: left; font-size: .95rem;
+}
+.dropdown-content button:hover { background: var(--surface-2); }
+
+/* ---------- Notlar penceresi ---------- */
+.modal { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; animation: fade .15s; }
+.notlar-box {
+  width: 100%; max-width: 880px;
+  height: min(660px, calc(100vh - 32px));
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.notlar-ust { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.notlar-ust h3 { margin: 0; font-size: 1.05rem; }
+.notlar-govde { flex: 1; display: grid; grid-template-columns: 250px 1fr; min-height: 0; }
+.not-liste-panel {
+  border-right: 1px solid var(--border); background: var(--surface-2);
+  padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 0;
+}
+.not-liste-panel .field { background: var(--surface); padding: 9px 12px; }
+.not-liste { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.not-oge {
+  width: 100%; text-align: left; border: 1px solid transparent; background: none; color: var(--text);
+  padding: 8px 10px; border-radius: 8px; display: flex; flex-direction: column;
+}
+.not-oge:hover { background: var(--surface); }
+.not-oge.aktif { background: var(--accent-soft); border-color: var(--accent); }
+.not-oge .b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.not-oge .t { font-size: .74rem; color: var(--muted); }
+.not-bos { color: var(--muted); font-size: .85rem; padding: 8px 4px; }
+.not-editor { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.not-editor-ust { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+#notBaslik { font-weight: 700; }
+#notMetni { flex: 1; min-height: 120px; resize: none; font-family: var(--mono); font-size: .92rem; }
+.not-alt { display: flex; gap: 8px; align-items: center; }
+.not-alt .bosluk { flex: 1; }
+.mobil { display: none !important; }
+
+.app-footer { text-align: center; color: var(--muted); font-size: .78rem; padding: 16px; border-top: 1px solid var(--border); }
+
+/* ---------- SweetAlert teması ---------- */
+.swal2-popup { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; }
+.swal2-title, .swal2-html-container, .swal2-input-label { color: var(--text) !important; }
+.swal2-input, .swal2-textarea, .swal2-file {
+  background: var(--surface-2) !important; color: var(--text) !important;
+  border: 1px solid var(--border) !important; border-radius: var(--radius-sm) !important; box-shadow: none !important;
+}
+.swal2-input:focus, .swal2-textarea:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; }
+.swal2-input:disabled { opacity: .7; }
+.swal2-styled.swal2-confirm { background: var(--accent) !important; }
+.swal2-styled.swal2-cancel { background: var(--surface-2) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+.swal2-styled.swal2-deny { background: var(--danger) !important; }
+.swal2-styled:focus { box-shadow: 0 0 0 3px var(--accent-soft) !important; }
+.swal2-validation-message { background: var(--surface-2) !important; color: var(--text) !important; }
+.swal2-timer-progress-bar { background: var(--accent) !important; }
+.swal2-close:hover { color: var(--danger) !important; }
+.ayar-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.ayar-baslik { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: left; margin: 8px 2px 0; }
+.ayar-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-weight: 600; text-align: left; transition: border-color .15s;
+}
+.ayar-btn:hover { border-color: var(--accent); }
+.ayar-btn.tehlike { color: var(--danger); }
+.ayar-btn.tehlike:hover { border-color: var(--danger); }
+.swal-uyari { color: var(--warn); font-weight: 600; }
+.yardim-liste { text-align: left; padding-left: 20px; margin: 0; }
+.yardim-liste li { margin-bottom: 8px; }
+.yardim-liste code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; font-family: var(--mono); font-size: .88em; }
+
+@keyframes giris { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 640px) {
+  .modal { padding: 8px; }
+  .notlar-box { height: calc(100vh - 16px); }
+  .notlar-govde { grid-template-columns: 1fr; }
+  .not-liste-panel { border-right: none; }
+  .notlar-govde.editor-acik .not-liste-panel { display: none; }
+  .notlar-govde:not(.editor-acik) .not-editor { display: none; }
+  .mobil { display: inline-flex !important; }
+}
+@media (max-width: 480px) {
+  .app { padding: 12px 12px 24px; }
+  .card { padding: 16px; }
+  .login { margin-top: 12vh; }
+  .top-actions { gap: 6px; }
+  .top-actions .icon-btn { width: 40px; height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<main class="app">
+
+  <!-- ================= GİRİŞ ================= -->
+  <section id="loginSection" class="card login" hidden>
+    <button type="button" class="icon-btn tema-btn tema-kose" title="Temayı değiştir" aria-label="Temayı değiştir">🌙</button>
+    <img src="lock.png" alt="" class="login-logo">
+    <h1>Note's</h1>
+    <p class="muted small" style="margin:4px 0 0;">Kişisel not ve şifre kasası</p>
+
+    <form id="loginForm" autocomplete="off" novalidate>
+      <div>
+        <label class="lbl" for="emailInput">E-posta</label>
+        <input class="field" type="text" inputmode="email" id="emailInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ornek@mail.com">
+      </div>
+      <div>
+        <label class="lbl" for="passwordInput">Şifre</label>
+        <div class="pw">
+          <input class="field maskeli" type="text" id="passwordInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••••••">
+          <button type="button" class="pw-btn toggle-password" data-target="passwordInput" title="Şifreyi göster" aria-label="Şifreyi göster">🐵</button>
+        </div>
+      </div>
+      <button type="submit" id="girisBtn" class="btn primary block">Giriş Yap</button>
+    </form>
+
+    <button type="button" class="link-btn" id="sifremiUnuttumBtn">Şifremi Unuttum</button>
+  </section>
+
+  <!-- ================= KASA KİLİDİ ================= -->
+  <section id="kilitSection" class="card login" hidden>
+    <button type="button" class="icon-btn tema-btn tema-kose" title="Temayı değiştir" aria-label="Temayı değiştir">🌙</button>
+    <img src="lock.png" alt="" class="login-logo">
+    <h1 id="kilitBaslik">Kasa kilitli</h1>
+    <p id="kilitAciklama" class="muted small" style="margin:4px 0 0;"></p>
+
+    <p id="kilitYukleniyor" class="muted kilit-durum">Yükleniyor…</p>
+
+    <form id="kilitForm" autocomplete="off" novalidate hidden>
+      <div>
+        <label class="lbl" for="anaSifre">Ana şifre</label>
+        <div class="pw">
+          <input class="field maskeli" type="text" id="anaSifre" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••••••">
+          <button type="button" class="pw-btn toggle-password" data-target="anaSifre" title="Şifreyi göster" aria-label="Şifreyi göster">🐵</button>
+        </div>
+      </div>
+      <div id="anaSifreTekrarAlan" hidden>
+        <label class="lbl" for="anaSifreTekrar">Ana şifre (tekrar)</label>
+        <div class="pw">
+          <input class="field maskeli" type="text" id="anaSifreTekrar" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••••••">
+          <button type="button" class="pw-btn toggle-password" data-target="anaSifreTekrar" title="Şifreyi göster" aria-label="Şifreyi göster">🐵</button>
+        </div>
+      </div>
+      <div id="kurulumUyari" class="uyari-kutu" hidden>
+        ⚠️ Ana şifre hiçbir yerde saklanmaz. Unutursanız kayıtlarınız <b>kurtarılamaz</b>.
+        Giriş şifrenizden farklı, güçlü bir şifre seçin ve güvenli bir yere not edin.
+      </div>
+      <button type="submit" id="kilitBtn" class="btn primary block">🔓 Kilidi aç</button>
+      <button type="button" id="kurulumYedekBtn" class="btn ghost block" hidden>⬇️ Önce mevcut verileri yedekle</button>
+    </form>
+
+    <button type="button" class="link-btn" id="kilitCikisBtn">Çıkış yap</button>
+  </section>
+
+  <!-- ================= UYGULAMA ================= -->
+  <section id="appSection" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <img src="lock.png" alt="">
+        <div class="brand-yazi">
+          <div class="brand-ad">Note's</div>
+          <div class="brand-alt" id="hosgeldinYazi"></div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="icon-btn tema-btn" title="Temayı değiştir" aria-label="Temayı değiştir">🌙</button>
+        <div class="dropdown">
+          <button type="button" class="icon-btn" id="menuBtn" title="Menü" aria-label="Menü" aria-haspopup="true" aria-expanded="false">☰</button>
+          <div class="dropdown-content" id="menuIcerik" role="menu">
+            <button type="button" data-menu="not" role="menuitem">📝 Notlar</button>
+            <button type="button" data-menu="ayarlar" role="menuitem">⚙️ Ayarlar</button>
+            <button type="button" data-menu="yardim" role="menuitem">❓ Yardım</button>
+            <button type="button" data-menu="iletisim" role="menuitem">📩 İletişim</button>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="kilitleBtn" title="Kasayı kilitle" aria-label="Kasayı kilitle">🔒</button>
+        <button type="button" class="icon-btn" id="cikisBtn" title="Çıkış yap" aria-label="Çıkış yap">🚪</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="search">
+        <span class="search-ikon">🔍</span>
+        <input class="field" type="text" id="kelimeBul" placeholder="Kayıtlarda ara…  (Ctrl+K)" autocomplete="off">
+        <button type="button" class="temizleBtn" id="temizleBtn" title="Temizle" aria-label="Aramayı temizle" hidden>✕</button>
+      </div>
+      <button type="button" class="icon-btn" id="gizlilikBtn" title="Hassas bilgileri gizle/göster">🙈</button>
+      <button type="button" class="icon-btn" id="notEkleBtn" title="Notlar">📝</button>
+    </div>
+
+    <section class="card form-card" id="formKart">
+      <h2 id="formBaslik">➕ Yeni kayıt</h2>
+      <div class="stack">
+        <input class="field" type="text" id="isimInput" placeholder="Başlık (ör. Gmail)" autocomplete="off">
+        <input class="field" type="text" id="soyadInput" placeholder="Kullanıcı adı / e-posta" autocomplete="off">
+        <div class="pw">
+          <input class="field" type="text" id="telefonInput" placeholder="Şifre / not" autocomplete="off" spellcheck="false">
+          <button type="button" class="pw-btn" id="sifreUretBtn" title="Güçlü şifre üret" aria-label="Güçlü şifre üret">🎲</button>
+        </div>
+        <input class="field" type="text" id="kategoriInput" placeholder="Kategori (ör. Banka, E-posta) — isteğe bağlı" autocomplete="off" list="kategoriListesi">
+        <datalist id="kategoriListesi"></datalist>
+        <div class="form-actions">
+          <button type="button" id="kaydetBtn" class="btn primary">➕ Kaydet</button>
+          <button type="button" id="vazgecBtn" class="btn ghost" hidden>✖ Vazgeç</button>
+        </div>
+      </div>
+    </section>
+
+    <h3 class="list-title">✍️ Kayıtlar <span class="badge" id="notSayisi">0</span></h3>
+    <div id="filtreler" class="chips" hidden></div>
+    <ul id="isimlerListesi" class="list"></ul>
+    <p id="bosMesaj" class="empty" hidden></p>
+  </section>
+</main>
+
+<!-- ================= NOTLAR ================= -->
+<div id="notModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="notModalBaslik">
+  <div class="notlar-box">
+    <div class="notlar-ust">
+      <h3 id="notModalBaslik">📝 Notlar</h3>
+      <button type="button" class="icon-btn sm" id="notKapatBtn" title="Kapat (Esc)" aria-label="Kapat">✕</button>
+    </div>
+    <div class="notlar-govde" id="notlarGovde">
+      <aside class="not-liste-panel">
+        <button type="button" class="btn primary small block" id="yeniNotBtn">➕ Yeni not</button>
+        <input type="text" class="field" id="notAra" placeholder="Notlarda ara…" autocomplete="off">
+        <ul class="not-liste" id="notListe"></ul>
+      </aside>
+      <section class="not-editor">
+        <div class="not-editor-ust">
+          <button type="button" class="btn ghost small mobil" id="notGeriBtn">← Notlar</button>
+          <span class="muted small" id="notDurum"></span>
+        </div>
+        <input type="text" class="field" id="notBaslik" placeholder="Başlık" autocomplete="off">
+        <textarea id="notMetni" class="field" placeholder="Notunuzu buraya yazın…" spellcheck="false"></textarea>
+        <div class="not-alt">
+          <button type="button" class="btn danger small" id="notSilBtn" hidden>🗑️ Sil</button>
+          <span class="bosluk"></span>
+          <button type="button" class="btn primary" id="notKaydetBtn">Kaydet</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<footer class="app-footer" id="appFooter" hidden>
+  Note's · Sürüm 3.0.0 · Uçtan uca şifreli · © 2025
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+'use strict';
+
+/* =========================================================
+   AYARLAR
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyBWj53RpZd_xcWGD-ZLIyXBYz8H9MehM7Y",
+  authDomain: "dosya01-7a585.firebaseapp.com",
+  databaseURL: "https://dosya01-7a585-default-rtdb.firebaseio.com",
+  projectId: "dosya01-7a585",
+  storageBucket: "dosya01-7a585.firebasestorage.app",
+  messagingSenderId: "502419176600",
+  appId: "1:502419176600:web:d4304f2a0bfc30d03ce4ed"
+};
+const GOOGLE_CLIENT_ID = "344034966705-8paqve5db6002isrh7ahjk6s2e1ps4ob.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const EMAILJS_KEY = "VCwxBwdvT-HFnnKZ0";
+
+const SESSION_TIMEOUT = 30 * 1000; // 30 sn hareketsizlikte otomatik çıkış
+const WARNING_TIME = 10 * 1000;    // çıkıştan 10 sn önce uyarı
+const PANO_SURE = 30 * 1000;       // kopyalanan metin 30 sn sonra panodan silinir
+const PBKDF2_ITER = 600000;        // ana şifreden anahtar türetme tur sayısı
+
+const THEME_KEY = 'notes-tema';
+const PRIV_KEY = 'notes-gizli';
+const VARSAYILAN_KATEGORILER = ['E-posta', 'Banka', 'Sosyal Medya', 'İş', 'Alışveriş', 'Oyun', 'Diğer'];
+
+/* Veritabanı yolları (mevcut kurallara uyması için yalnızca kayitlar/ ve notlar/ kullanılır) */
+const P = {
+  kayitlar: uid => `kayitlar/${uid}`,
+  kasa: uid => `notlar/${uid}/kasa`,
+  notListe: uid => `notlar/${uid}/liste`,
+  eskiNot: uid => `notlar/${uid}/not`
+};
+
+/* =========================================================
+   BAŞLATMA
+   ========================================================= */
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+if (window.emailjs) emailjs.init(EMAILJS_KEY);
+
+const $ = (id) => document.getElementById(id);
+const bekle = (ms) => new Promise(r => setTimeout(r, ms));
+const str = (v) => (v == null ? '' : String(v));
+
+let kayitRef = null;
+let kayitlar = [];
+let currentEditKey = null;
+let currentEditFavori = false;
+let aktifFiltre = 'tum';
+let cozumSayac = 0;
+
+let anahtar = null;   // AES anahtarı (yalnızca bellekte)
+let kasaMeta = null;  // { v, salt, iter, kontrol }
+let kilitModu = 'ac'; // 'ac' | 'kur'
+
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'bottom-end',
+  showConfirmButton: false,
+  timer: 1800,
+  timerProgressBar: true
+});
+
+function hata(title, text) {
+  return Swal.fire({ icon: 'error', title, text, confirmButtonText: 'Tamam' });
+}
+
+function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+/* =========================================================
+   ŞİFRELEME (AES-GCM 256, anahtar PBKDF2-SHA256 ile türetilir)
+   ========================================================= */
+const TE = new TextEncoder();
+const TD = new TextDecoder();
+
+function b64(buf) {
+  const b = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function unb64(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function rastgeleB64(n) { return b64(crypto.getRandomValues(new Uint8Array(n))); }
+function kriptoVarMi() { return !!(window.crypto && crypto.subtle && window.isSecureContext !== false); }
+const sifreliMi = (v) => !!(v && typeof v.iv === 'string' && typeof v.ct === 'string');
+
+async function anahtarTuret(sifre, saltB64, iter) {
+  const temel = await crypto.subtle.importKey('raw', TE.encode(sifre), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: unb64(saltB64), iterations: iter, hash: 'SHA-256' },
+    temel,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function sifrele(obj, key = anahtar) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, TE.encode(JSON.stringify(obj)));
+  return { iv: b64(iv), ct: b64(ct) };
+}
+
+async function coz(kutu, key = anahtar) {
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(kutu.iv) }, key, unb64(kutu.ct));
+  return JSON.parse(TD.decode(pt));
+}
+
+async function metaOlustur(sifre) {
+  const salt = rastgeleB64(16);
+  const key = await anahtarTuret(sifre, salt, PBKDF2_ITER);
+  const kontrol = await sifrele({ kasa: 'notes-ok' }, key);
+  return { key, meta: { v: 1, salt, iter: PBKDF2_ITER, kontrol, tarih: new Date().toISOString() } };
+}
+
+// Doğruysa anahtarı, yanlışsa null döner
+async function metaDogrula(sifre, meta) {
+  if (!meta || !meta.salt || !sifreliMi(meta.kontrol)) return null;
+  const key = await anahtarTuret(sifre, meta.salt, meta.iter || PBKDF2_ITER);
+  try {
+    const o = await coz(meta.kontrol, key);
+    if (o && o.kasa === 'notes-ok') return key;
+  } catch (e) {}
+  return null;
+}
+
+function kayitNormal(v) {
+  v = v || {};
+  return {
+    ad: str(v.ad), soyad: str(v.soyad), telefon: str(v.telefon),
+    kategori: str(v.kategori).trim(), favori: v.favori === true, tarih: str(v.tarih)
+  };
+}
+function notNormal(v) {
+  v = v || {};
+  return { baslik: str(v.baslik), metin: str(v.metin), tarih: str(v.tarih) };
+}
+
+/* =========================================================
+   TEMA
+   ========================================================= */
+function temaUygula(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.querySelectorAll('.tema-btn').forEach(b => {
+    b.textContent = t === 'dark' ? '☀️' : '🌙';
+    b.title = t === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç';
+  });
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = t === 'dark' ? '#12131b' : '#f2f4f9';
+}
+temaUygula(document.documentElement.getAttribute('data-theme') || 'dark');
+
+document.querySelectorAll('.tema-btn').forEach(b => b.addEventListener('click', () => {
+  const yeni = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  temaUygula(yeni);
+  storeSet(THEME_KEY, yeni);
+}));
+
+if (window.matchMedia) {
+  const mq = matchMedia('(prefers-color-scheme: dark)');
+  const sistemDegisti = (e) => {
+    const kayitli = storeGet(THEME_KEY);
+    if (kayitli !== 'light' && kayitli !== 'dark') temaUygula(e.matches ? 'dark' : 'light');
+  };
+  if (mq.addEventListener) mq.addEventListener('change', sistemDegisti);
+}
+
+/* =========================================================
+   GİZLİLİK MODU (kullanıcı adı ve şifreyi bulanıklaştır)
+   ========================================================= */
+function gizlilikUygula(acik) {
+  document.body.classList.toggle('gizli-mod', acik);
+  const b = $('gizlilikBtn');
+  b.textContent = acik ? '🙈' : '👁️';
+  b.classList.toggle('aktif', acik);
+  b.title = acik ? 'Gizlilik modu açık — göstermek için tıklayın' : 'Gizlilik modu kapalı — gizlemek için tıklayın';
+}
+gizlilikUygula(storeGet(PRIV_KEY) !== '0');
+$('gizlilikBtn').addEventListener('click', () => {
+  const acik = !document.body.classList.contains('gizli-mod');
+  gizlilikUygula(acik);
+  storeSet(PRIV_KEY, acik ? '1' : '0');
+  document.querySelectorAll('.gizlenebilir.acik').forEach(s => s.classList.remove('acik'));
+});
+
+/* =========================================================
+   HATA MESAJLARI
+   ========================================================= */
+function authHataMesaji(e) {
+  const kod = (e && e.code) || '';
+  const msg = (e && e.message) || '';
+  if (msg.includes('INVALID_LOGIN_CREDENTIALS')) return 'E-posta veya şifre yanlış.';
+  const m = {
+    'auth/invalid-email': 'Geçersiz e-posta adresi.',
+    'auth/user-disabled': 'Bu hesap devre dışı bırakılmış.',
+    'auth/user-not-found': 'E-posta veya şifre yanlış.',
+    'auth/wrong-password': 'Şifre yanlış.',
+    'auth/invalid-credential': 'E-posta veya şifre yanlış.',
+    'auth/too-many-requests': 'Çok fazla başarısız deneme yapıldı. Bir süre sonra tekrar deneyin.',
+    'auth/network-request-failed': 'İnternet bağlantınızı kontrol edin.',
+    'auth/requires-recent-login': 'Güvenlik için çıkış yapıp tekrar giriş yapmanız gerekiyor.',
+    'auth/email-already-in-use': 'Bu e-posta başka bir hesapta kullanılıyor.',
+    'auth/weak-password': 'Şifre en az 6 karakter olmalı.',
+    'auth/operation-not-allowed': 'Bu işlem Firebase ayarlarında kapalı.'
+  };
+  return m[kod] || ('Bir hata oluştu: ' + msg);
+}
+
+/* =========================================================
+   GİRİŞ / ÇIKIŞ
+   ========================================================= */
+document.querySelectorAll('.toggle-password').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = $(btn.dataset.target);
+    const goster = input.classList.contains('maskeli');
+    input.classList.toggle('maskeli', !goster);
+    btn.textContent = goster ? '🙈' : '🐵';
+    btn.title = goster ? 'Şifreyi gizle' : 'Şifreyi göster';
+  });
+});
+
+$('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('emailInput').value.trim();
+  const sifre = $('passwordInput').value;
+
+  if (!email) return hata('Giriş Hatası', 'Lütfen e-posta adresinizi girin.');
+  if (!sifre) return hata('Giriş Hatası', 'Lütfen şifrenizi girin.');
+
+  const btn = $('girisBtn');
+  btn.disabled = true;
+  btn.textContent = 'Giriş yapılıyor…';
+  try {
+    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    const cred = await auth.signInWithEmailAndPassword(email, sifre);
+    $('passwordInput').value = '';
+
+    if (!cred.user.emailVerified) {
+      const r = await Swal.fire({
+        icon: 'warning',
+        title: 'E-posta doğrulanmamış',
+        html: 'Giriş yapabilmek için e-postanıza gönderilen <strong>doğrulama bağlantısına</strong> tıklamanız gerekiyor.',
+        showCancelButton: true,
+        confirmButtonText: 'Bağlantıyı tekrar gönder',
+        cancelButtonText: 'Kapat'
+      });
+      if (r.isConfirmed) {
+        try {
+          await cred.user.sendEmailVerification();
+          Toast.fire({ icon: 'success', title: 'Doğrulama e-postası gönderildi' });
+        } catch (err) {
+          hata('Gönderilemedi', authHataMesaji(err));
+        }
+      }
+      await auth.signOut();
+    }
+  } catch (err) {
+    console.error('Giriş hatası:', err);
+    hata('Giriş Hatası', authHataMesaji(err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Giriş Yap';
+  }
+});
+
+$('sifremiUnuttumBtn').addEventListener('click', async () => {
+  const r = await Swal.fire({
+    title: 'Şifre Sıfırlama',
+    input: 'email',
+    inputLabel: 'Hesabınızın e-posta adresi',
+    inputValue: $('emailInput').value.trim(),
+    inputPlaceholder: 'E-posta adresiniz',
+    showCancelButton: true,
+    confirmButtonText: 'Bağlantı gönder',
+    cancelButtonText: 'İptal',
+    validationMessage: 'Lütfen geçerli bir e-posta adresi girin.'
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await auth.sendPasswordResetEmail(r.value);
+    Swal.fire({ icon: 'success', title: 'Bağlantı gönderildi', text: 'Hesap varsa şifre sıfırlama bağlantısı e-postanıza gönderildi. (Bu yalnızca giriş şifresini sıfırlar; ana şifre sıfırlanamaz.)' });
+  } catch (err) {
+    hata('Hata', authHataMesaji(err));
+  }
+});
+
+$('cikisBtn').addEventListener('click', () => oturumuKapat(false));
+$('kilitCikisBtn').addEventListener('click', () => oturumuKapat(false));
+$('kilitleBtn').addEventListener('click', kasayiKilitle);
+
+async function oturumuKapat(zamanAsimi) {
+  oturumDurdur();
+  await kirliNotuKaydet();
+  try { await auth.signOut(); } catch (err) { console.error('Çıkış hatası:', err); }
+  panoTemizle();
+  if (zamanAsimi) {
+    Swal.fire({ icon: 'info', title: 'Oturum kapatıldı', text: `${SESSION_TIMEOUT / 1000} saniye işlem yapılmadığı için güvenliğiniz adına çıkış yapıldı.`, confirmButtonText: 'Tamam' });
+  }
+}
+
+async function kasayiKilitle() {
+  const user = auth.currentUser;
+  if (!user) return;
+  await kirliNotuKaydet();
+  panoTemizle();
+  kilitEkraniAc(user);
+}
+
+auth.onAuthStateChanged((user) => {
+  if (user && user.emailVerified) kilitEkraniAc(user);
+  else girisEkraniniGoster();
+});
+
+function bolumGoster(ad) {
+  $('loginSection').hidden = ad !== 'giris';
+  $('kilitSection').hidden = ad !== 'kilit';
+  $('appSection').hidden = ad !== 'app';
+  $('appFooter').hidden = ad !== 'app';
+}
+
+function uygulamaTemizle() {
+  if (kayitRef) { kayitRef.off(); kayitRef = null; }
+  cozumSayac++;
+  anahtar = null;
+  kasaMeta = null;
+  kayitlar = [];
+  aktifFiltre = 'tum';
+  $('isimlerListesi').replaceChildren();
+  $('filtreler').replaceChildren();
+  $('filtreler').hidden = true;
+  $('bosMesaj').hidden = true;
+  $('kelimeBul').value = '';
+  $('temizleBtn').hidden = true;
+  formuSifirla();
+  notModalZorlaKapat();
+  menuKapat();
+}
+
+function girisEkraniniGoster() {
+  uygulamaTemizle();
+  oturumDurdur();
+  bolumGoster('giris');
+  $('emailInput').focus();
+}
+
+async function kilitEkraniAc(user) {
+  uygulamaTemizle();
+  bolumGoster('kilit');
+  oturumBaslat();
+
+  $('kilitForm').hidden = true;
+  $('kilitYukleniyor').hidden = false;
+  $('kilitYukleniyor').textContent = 'Yükleniyor…';
+  $('kilitBaslik').textContent = 'Kasa kilitli';
+  $('kilitAciklama').textContent = user.email;
+  $('anaSifre').value = '';
+  $('anaSifreTekrar').value = '';
+
+  if (!kriptoVarMi()) {
+    $('kilitYukleniyor').textContent = 'Bu tarayıcı şifrelemeyi desteklemiyor. Sayfa https üzerinden açılmalı.';
+    return;
+  }
+
+  let meta;
+  try {
+    const snap = await db.ref(P.kasa(user.uid)).once('value');
+    meta = snap.val();
+  } catch (err) {
+    $('kilitYukleniyor').textContent = 'Kasa bilgisi okunamadı: ' + err.message;
+    return;
+  }
+  if (!auth.currentUser || auth.currentUser.uid !== user.uid) return;
+
+  kasaMeta = meta && meta.salt ? meta : null;
+  kilitModu = kasaMeta ? 'ac' : 'kur';
+  const kur = kilitModu === 'kur';
+
+  $('kilitBaslik').textContent = kur ? 'Ana şifre oluştur' : 'Kasa kilitli';
+  $('kilitAciklama').textContent = kur
+    ? 'Kayıtlarınız bu şifreyle cihazınızda şifrelenecek; Firebase’e yalnızca şifreli hâli gidecek.'
+    : user.email;
+  $('anaSifreTekrarAlan').hidden = !kur;
+  $('kurulumUyari').hidden = !kur;
+  $('kurulumYedekBtn').hidden = !kur;
+  $('kilitBtn').textContent = kur ? '🔐 Kasayı oluştur' : '🔓 Kilidi aç';
+  $('kilitYukleniyor').hidden = true;
+  $('kilitForm').hidden = false;
+  $('anaSifre').focus();
+}
+
+$('kurulumYedekBtn').addEventListener('click', notlariIndir);
+
+$('kilitForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const user = auth.currentUser;
+  if (!user) return;
+  const sifre = $('anaSifre').value;
+  if (!sifre) return hata('Ana şifre', 'Lütfen ana şifrenizi girin.');
+
+  if (kilitModu === 'kur') {
+    if (sifre.length < 8) return hata('Ana şifre', 'Ana şifre en az 8 karakter olmalı.');
+    if (sifre !== $('anaSifreTekrar').value) return hata('Ana şifre', 'Şifreler eşleşmiyor.');
+    const onay = await Swal.fire({
+      icon: 'warning',
+      title: 'Emin misiniz?',
+      html: 'Ana şifrenizi unutursanız <b>hiçbir kaydınızı geri getiremezsiniz</b>. Şifreyi güvenli bir yere not ettiniz mi?',
+      showCancelButton: true,
+      confirmButtonText: 'Evet, oluştur',
+      cancelButtonText: 'Geri dön',
+      reverseButtons: true
+    });
+    if (!onay.isConfirmed) return;
+  }
+
+  const btn = $('kilitBtn');
+  const eskiYazi = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Lütfen bekleyin…';
+  try {
+    if (kilitModu === 'kur') {
+      await kasaKur(user, sifre);
+      Toast.fire({ icon: 'success', title: 'Kasa oluşturuldu, veriler şifrelendi' });
+    } else {
+      const key = await metaDogrula(sifre, kasaMeta);
+      if (!key) {
+        await bekle(700);
+        $('anaSifre').value = '';
+        $('anaSifre').focus();
+        hata('Kilit açılamadı', 'Ana şifre yanlış.');
+        return;
+      }
+      anahtar = key;
+    }
+    $('anaSifre').value = '';
+    $('anaSifreTekrar').value = '';
+    uygulamayiGoster(user);
+  } catch (err) {
+    console.error('Kilit hatası:', err);
+    hata('Hata', err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = eskiYazi;
+  }
+});
+
+// İlk kurulum: mevcut düz metin verileri şifreleyip tek seferde (atomik) yazar
+async function kasaKur(user, sifre) {
+  const uid = user.uid;
+  const { key, meta } = await metaOlustur(sifre);
+  const [kSnap, lSnap, nSnap] = await Promise.all([
+    db.ref(P.kayitlar(uid)).once('value'),
+    db.ref(P.notListe(uid)).once('value'),
+    db.ref(P.eskiNot(uid)).once('value')
+  ]);
+  const up = {};
+  for (const [k, v] of Object.entries(kSnap.val() || {})) {
+    if (v && !sifreliMi(v)) up[`${P.kayitlar(uid)}/${k}`] = await sifrele(kayitNormal(v), key);
+  }
+  for (const [k, v] of Object.entries(lSnap.val() || {})) {
+    if (v && !sifreliMi(v)) up[`${P.notListe(uid)}/${k}`] = await sifrele(notNormal(v), key);
+  }
+  const eski = nSnap.val();
+  if (eski && eski.metin) {
+    const nk = db.ref(P.notListe(uid)).push().key;
+    up[`${P.notListe(uid)}/${nk}`] = await sifrele(notNormal({ baslik: 'Not defteri', metin: eski.metin, tarih: eski.tarih || new Date().toISOString() }), key);
+  }
+  if (eski) up[P.eskiNot(uid)] = null;
+  up[P.kasa(uid)] = meta;
+  await db.ref().update(up);
+  anahtar = key;
+  kasaMeta = meta;
+}
+
+function uygulamayiGoster(user) {
+  bolumGoster('app');
+  $('hosgeldinYazi').textContent = user.email;
+  kategoriOnerileri();
+  verileriDinle(user.uid);
+  $('kelimeBul').focus();
+}
+
+/* =========================================================
+   OTURUM ZAMAN AŞIMI
+   ========================================================= */
+let sonAktivite = Date.now();
+let uyariTimer = null;
+let uyariAcik = false;
+let oturumAktif = false;
+
+function zamanlayiciKur() {
+  clearTimeout(uyariTimer);
+  uyariTimer = setTimeout(uyariGoster, SESSION_TIMEOUT - WARNING_TIME);
+}
+function oturumBaslat() {
+  oturumAktif = true;
+  uyariAcik = false;
+  sonAktivite = Date.now();
+  zamanlayiciKur();
+}
+function oturumDurdur() {
+  oturumAktif = false;
+  clearTimeout(uyariTimer);
+}
+function aktivite() {
+  if (!oturumAktif || uyariAcik) return;
+  const simdi = Date.now();
+  if (simdi - sonAktivite < 500) return;
+  sonAktivite = simdi;
+  zamanlayiciKur();
+}
+['mousemove', 'keydown', 'scroll', 'click', 'touchstart', 'input'].forEach(ev =>
+  document.addEventListener(ev, aktivite, { passive: true, capture: true })
+);
+// Arka planda zamanlayıcılar gecikebilir; sekmeye dönünce süreyi kontrol et
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && oturumAktif &&
+      Date.now() - sonAktivite > SESSION_TIMEOUT) {
+    oturumuKapat(true);
+  }
+});
+
+function uyariGoster() {
+  if (!oturumAktif) return;
+  if (Date.now() - sonAktivite >= SESSION_TIMEOUT) { oturumuKapat(true); return; }
+  uyariAcik = true;
+  Swal.fire({
+    icon: 'warning',
+    title: 'Oturum kapanmak üzere',
+    text: `${WARNING_TIME / 1000} saniye içinde otomatik olarak çıkış yapılacak.`,
+    showCancelButton: true,
+    confirmButtonText: 'Oturumu açık tut',
+    cancelButtonText: 'Şimdi çık',
+    reverseButtons: true,
+    timer: WARNING_TIME,
+    timerProgressBar: true,
+    allowOutsideClick: false,
+    allowEscapeKey: false
+  }).then((r) => {
+    uyariAcik = false;
+    if (!oturumAktif) return;
+    if (r.isConfirmed) {
+      sonAktivite = Date.now();
+      zamanlayiciKur();
+    } else {
+      oturumuKapat(r.dismiss === Swal.DismissReason.timer);
+    }
+  });
+}
+
+/* =========================================================
+   KAYITLAR
+   ========================================================= */
+async function kayitAc(k, raw, key) {
+  if (sifreliMi(raw)) {
+    try { return Object.assign({ key: k }, kayitNormal(await coz(raw, key))); }
+    catch (e) { return Object.assign({ key: k, bozuk: true }, kayitNormal({})); }
+  }
+  return Object.assign({ key: k, duz: true }, kayitNormal(raw));
+}
+
+function verileriDinle(uid) {
+  if (kayitRef) kayitRef.off();
+  kayitRef = db.ref(P.kayitlar(uid));
+  kayitRef.on('value', async (snap) => {
+    const sira = ++cozumSayac;
+    const key = anahtar;
+    if (!key) return;
+    const v = snap.val() || {};
+    const liste = await Promise.all(Object.entries(v).map(([k, raw]) => kayitAc(k, raw, key)));
+    if (sira !== cozumSayac || anahtar !== key) return;
+
+    kayitlar = liste;
+    sirala();
+    listeyiCiz();
+    kategoriOnerileri();
+
+    // Eski sürümden kalan düz metin kayıtları otomatik şifrele
+    const duz = liste.filter(k => k.duz);
+    if (duz.length) {
+      const up = {};
+      for (const k of duz) up[`${P.kayitlar(uid)}/${k.key}`] = await sifrele(kayitNormal(k), key);
+      db.ref().update(up).catch(err => console.error('Otomatik şifreleme hatası:', err));
+    }
+  }, (err) => {
+    console.error('Veri okuma hatası:', err);
+    hata('Veriler okunamadı', err.message);
+  });
+}
+
+function zaman(t) {
+  const n = t ? new Date(t).getTime() : 0;
+  return isNaN(n) ? 0 : n;
+}
+
+function tarihFormat(t) {
+  const n = zaman(t);
+  if (!n) return '';
+  return new Date(n).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function sirala() {
+  kayitlar.sort((a, b) => (Number(b.favori) - Number(a.favori)) || (zaman(b.tarih) - zaman(a.tarih)));
+}
+
+// **https://...** biçimindeki değerleri güvenli bağlantıya çevirir
+function ayristir(metin) {
+  const m = /^\*\*([\s\S]*?)\*\*$/.exec(metin);
+  if (!m) return { yazi: metin, link: null };
+  const icerik = m[1].trim();
+  if (/^(https?:\/\/|www\.)\S+$/i.test(icerik)) {
+    return { yazi: icerik, link: icerik.toLowerCase().startsWith('www.') ? 'https://' + icerik : icerik };
+  }
+  return { yazi: icerik, link: null };
+}
+
+function filtreUygun(k) {
+  if (aktifFiltre === 'fav') return k.favori;
+  if (aktifFiltre.startsWith('kat:')) return k.kategori === aktifFiltre.slice(4);
+  return true;
+}
+
+function filtreleriCiz() {
+  const sayac = new Map();
+  let fav = 0;
+  kayitlar.forEach(k => {
+    if (k.favori) fav++;
+    if (k.kategori) sayac.set(k.kategori, (sayac.get(k.kategori) || 0) + 1);
+  });
+  if (aktifFiltre === 'fav' && !fav) aktifFiltre = 'tum';
+  if (aktifFiltre.startsWith('kat:') && !sayac.has(aktifFiltre.slice(4))) aktifFiltre = 'tum';
+
+  const chips = [['tum', 'Tümü', kayitlar.length]];
+  if (fav) chips.push(['fav', '⭐ Favoriler', fav]);
+  [...sayac.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
+    .forEach(([ad, n]) => chips.push(['kat:' + ad, ad, n]));
+
+  const wrap = $('filtreler');
+  if (chips.length <= 1) { wrap.replaceChildren(); wrap.hidden = true; return; }
+  wrap.hidden = false;
+  wrap.replaceChildren(...chips.map(([id, ad, n]) => {
+    const b = el('button', 'chip' + (id === aktifFiltre ? ' aktif' : ''));
+    b.type = 'button';
+    b.append(ad, el('span', 'n', String(n)));
+    b.addEventListener('click', () => { aktifFiltre = id; listeyiCiz(); });
+    return b;
+  }));
+}
+
+function listeyiCiz() {
+  filtreleriCiz();
+  const q = $('kelimeBul').value.trim().toLocaleLowerCase('tr');
+  const filtre = kayitlar.filter(k =>
+    filtreUygun(k) &&
+    (!q || [k.ad, k.soyad, k.telefon, k.kategori].join('\n').toLocaleLowerCase('tr').includes(q))
+  );
+
+  const filtreli = q || aktifFiltre !== 'tum';
+  $('notSayisi').textContent = filtreli ? `${filtre.length} / ${kayitlar.length}` : String(kayitlar.length);
+  $('isimlerListesi').replaceChildren(...filtre.map(kartOlustur));
+
+  const bos = $('bosMesaj');
+  if (kayitlar.length === 0) { bos.textContent = 'Henüz kayıt yok. Yukarıdaki formdan ilk kaydınızı ekleyin.'; bos.hidden = false; }
+  else if (filtre.length === 0) { bos.textContent = 'Eşleşen kayıt bulunamadı.'; bos.hidden = false; }
+  else bos.hidden = true;
+}
+
+function miniBtn(cls, icon, title, fn) {
+  const b = el('button', 'mini-btn ' + cls, icon);
+  b.type = 'button';
+  b.title = title;
+  b.setAttribute('aria-label', title);
+  b.addEventListener('click', fn);
+  return b;
+}
+
+function kartOlustur(k) {
+  const li = el('li', 'kayit');
+  if (k.key === currentEditKey) li.classList.add('duzenleniyor');
+  if (k.favori) li.classList.add('favori');
+
+  const ust = el('div', 'kayit-ust');
+  const meta = el('div', 'kayit-meta');
+  if (k.kategori) {
+    const r = el('button', 'kat-rozet', k.kategori);
+    r.type = 'button';
+    r.title = 'Bu kategoriyi göster';
+    r.addEventListener('click', () => { aktifFiltre = 'kat:' + k.kategori; listeyiCiz(); });
+    meta.append(r);
+  }
+  meta.append(el('span', 'kayitZamani', tarihFormat(k.tarih)));
+  ust.append(meta);
+
+  const aks = el('div', 'kayit-aksiyon');
+  if (!k.bozuk) {
+    aks.append(
+      miniBtn('yildiz' + (k.favori ? ' aktif' : ''), k.favori ? '★' : '☆', k.favori ? 'Favorilerden çıkar' : 'Favorilere ekle', () => favoriDegistir(k)),
+      miniBtn('', '✏️', 'Düzenle', () => duzenle(k))
+    );
+  }
+  aks.append(miniBtn('sil', '🗑️', 'Sil', () => sil(k)));
+  ust.append(aks);
+  li.append(ust);
+
+  if (k.bozuk) {
+    li.append(el('div', 'bozuk-yazi', '🔒 Bu kayıt çözülemedi (farklı bir ana şifreyle şifrelenmiş olabilir).'));
+    return li;
+  }
+
+  [['ad', 'Başlık'], ['soyad', 'Kullanıcı adı'], ['telefon', 'Şifre / not']].forEach(([alan, etiket], i) => {
+    const deger = k[alan];
+    if (!deger) return;
+    const { yazi, link } = ayristir(deger);
+
+    const satir = el('div', 'bilgiSatiri' + (i === 0 ? ' baslik' : ''));
+    const kopya = el('button', 'kopyalaBtn', '⎘');
+    kopya.type = 'button';
+    kopya.title = etiket + ' kopyala';
+    kopya.setAttribute('aria-label', etiket + ' kopyala');
+    kopya.addEventListener('click', () => kopyala(yazi));
+
+    const span = el('span', 'kayit-metin' + (i > 0 ? ' gizlenebilir' : ''));
+    span.addEventListener('click', (e) => {
+      if (document.body.classList.contains('gizli-mod') && span.classList.contains('gizlenebilir') && !span.classList.contains('acik')) {
+        e.preventDefault();
+        span.classList.add('acik');
+      }
+    });
+    if (link) {
+      const a = el('a', null, yazi);
+      a.href = link;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      span.append(a);
+    } else {
+      span.textContent = yazi;
+    }
+    satir.append(kopya, span);
+    li.append(satir);
+  });
+
+  return li;
+}
+
+function kategoriOnerileri() {
+  const set = new Set(VARSAYILAN_KATEGORILER);
+  kayitlar.forEach(k => { if (k.kategori) set.add(k.kategori); });
+  $('kategoriListesi').replaceChildren(...[...set].sort((a, b) => a.localeCompare(b, 'tr')).map(ad => {
+    const o = document.createElement('option');
+    o.value = ad;
+    return o;
+  }));
+}
+
+async function kaydet() {
+  const user = auth.currentUser;
+  if (!user || !anahtar) return;
+
+  const veri = {
+    ad: $('isimInput').value.trim(),
+    soyad: $('soyadInput').value.trim(),
+    telefon: $('telefonInput').value.trim(),
+    kategori: $('kategoriInput').value.trim(),
+    favori: currentEditKey ? currentEditFavori : false,
+    tarih: new Date().toISOString()
+  };
+  if (!veri.ad && !veri.soyad && !veri.telefon) {
+    Swal.fire({ icon: 'info', text: 'Lütfen başlık, kullanıcı adı veya şifreden en az birini doldurun.', confirmButtonText: 'Tamam' });
+    return;
+  }
+
+  const btn = $('kaydetBtn');
+  btn.disabled = true;
+  try {
+    const kutu = await sifrele(veri);
+    if (currentEditKey) {
+      await db.ref(`${P.kayitlar(user.uid)}/${currentEditKey}`).set(kutu);
+      Toast.fire({ icon: 'success', title: 'Kayıt güncellendi' });
+    } else {
+      await db.ref(P.kayitlar(user.uid)).push(kutu);
+      Toast.fire({ icon: 'success', title: 'Kayıt eklendi' });
+    }
+    formuSifirla();
+  } catch (err) {
+    console.error('Kaydetme hatası:', err);
+    hata('Kaydedilemedi', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function favoriDegistir(k) {
+  const user = auth.currentUser;
+  if (!user || !anahtar) return;
+  const yeni = Object.assign(kayitNormal(k), { favori: !k.favori });
+  try {
+    await db.ref(`${P.kayitlar(user.uid)}/${k.key}`).set(await sifrele(yeni));
+    if (currentEditKey === k.key) currentEditFavori = yeni.favori;
+  } catch (err) {
+    hata('Güncellenemedi', err.message);
+  }
+}
+
+function duzenle(k) {
+  currentEditKey = k.key;
+  currentEditFavori = k.favori;
+  $('isimInput').value = k.ad;
+  $('soyadInput').value = k.soyad;
+  $('telefonInput').value = k.telefon;
+  $('kategoriInput').value = k.kategori;
+  $('formBaslik').textContent = '✏️ Kaydı düzenle';
+  $('kaydetBtn').textContent = '✔ Güncelle';
+  $('vazgecBtn').hidden = false;
+  $('formKart').classList.add('duzenleme');
+  listeyiCiz();
+  $('formKart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('isimInput').focus({ preventScroll: true });
+}
+
+function formuSifirla() {
+  currentEditKey = null;
+  currentEditFavori = false;
+  ['isimInput', 'soyadInput', 'telefonInput', 'kategoriInput'].forEach(id => { $(id).value = ''; });
+  $('formBaslik').textContent = '➕ Yeni kayıt';
+  $('kaydetBtn').textContent = '➕ Kaydet';
+  $('vazgecBtn').hidden = true;
+  $('formKart').classList.remove('duzenleme');
+  if (kayitlar.length) listeyiCiz();
+}
+
+async function sil(k) {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    icon: 'warning',
+    title: 'Kayıt silinsin mi?',
+    text: k.ad ? `"${k.ad}" kalıcı olarak silinecek.` : 'Bu kayıt kalıcı olarak silinecek.',
+    showCancelButton: true,
+    confirmButtonText: 'Evet, sil',
+    cancelButtonText: 'İptal',
+    confirmButtonColor: '#dc3e42',
+    reverseButtons: true
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await db.ref(`${P.kayitlar(user.uid)}/${k.key}`).remove();
+    if (currentEditKey === k.key) formuSifirla();
+    Toast.fire({ icon: 'success', title: 'Kayıt silindi' });
+  } catch (err) {
+    console.error('Silme hatası:', err);
+    hata('Silinemedi', err.message);
+  }
+}
+
+$('kaydetBtn').addEventListener('click', kaydet);
+$('vazgecBtn').addEventListener('click', formuSifirla);
+['isimInput', 'soyadInput', 'telefonInput'].forEach(id => {
+  $(id).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); kaydet(); }
+  });
+});
+
+/* Güçlü şifre üretici */
+function sifreUret(uzunluk = 20) {
+  const set = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*-_=+?';
+  const sinir = Math.floor(0x100000000 / set.length) * set.length; // eşit dağılım için
+  let sonuc = '';
+  while (sonuc.length < uzunluk) {
+    const dizi = new Uint32Array(uzunluk);
+    crypto.getRandomValues(dizi);
+    for (const n of dizi) {
+      if (n < sinir && sonuc.length < uzunluk) sonuc += set[n % set.length];
+    }
+  }
+  return sonuc;
+}
+$('sifreUretBtn').addEventListener('click', () => {
+  $('telefonInput').value = sifreUret();
+  Toast.fire({ icon: 'success', title: 'Güçlü şifre üretildi' });
+});
+
+/* =========================================================
+   KOPYALAMA + 30 SN SONRA PANOYU TEMİZLEME
+   ========================================================= */
+let panoTimer = null;
+let panoBekliyor = false;
+
+async function panoyaYaz(metin) {
+  try {
+    await navigator.clipboard.writeText(metin);
+    return true;
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = metin || ' ';
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e2) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+async function kopyala(metin) {
+  if (!metin) return;
+  await panoyaYaz(metin);
+  clearTimeout(panoTimer);
+  panoBekliyor = true;
+  panoTimer = setTimeout(panoTemizle, PANO_SURE);
+  Toast.fire({ icon: 'success', title: `Kopyalandı · ${PANO_SURE / 1000} sn sonra panodan silinecek`, timer: 2200 });
+}
+
+async function panoTemizle() {
+  clearTimeout(panoTimer);
+  panoTimer = null;
+  if (!panoBekliyor) return;
+  try {
+    await navigator.clipboard.writeText('');
+    panoBekliyor = false;
+  } catch (e) {
+    // Sayfa odakta değilse tarayıcı izin vermez; sayfaya dönünce tekrar denenir
+  }
+}
+window.addEventListener('focus', () => { if (panoBekliyor && !panoTimer) panoTemizle(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && panoBekliyor && !panoTimer) panoTemizle();
+});
+
+/* Arama */
+$('kelimeBul').addEventListener('input', () => {
+  $('temizleBtn').hidden = $('kelimeBul').value === '';
+  listeyiCiz();
+});
+$('temizleBtn').addEventListener('click', () => {
+  $('kelimeBul').value = '';
+  $('temizleBtn').hidden = true;
+  listeyiCiz();
+  $('kelimeBul').focus();
+});
+
+/* =========================================================
+   NOTLAR (çoklu, şifreli)
+   ========================================================= */
+let notlar = [];
+let aktifNotKey = null;
+let notKirli = false;
+
+const notModalAcikMi = () => !$('notModal').hidden;
+
+function notDurumYaz(t) { $('notDurum').textContent = t; }
+
+function notlariSirala() {
+  notlar.sort((a, b) => zaman(b.tarih) - zaman(a.tarih));
+}
+
+function notListesiCiz() {
+  const q = $('notAra').value.trim().toLocaleLowerCase('tr');
+  const liste = q ? notlar.filter(n => (n.baslik + '\n' + n.metin).toLocaleLowerCase('tr').includes(q)) : notlar;
+  const ul = $('notListe');
+  if (!liste.length) {
+    ul.replaceChildren(el('li', 'not-bos', notlar.length ? 'Eşleşen not yok.' : 'Henüz not yok.'));
+    return;
+  }
+  ul.replaceChildren(...liste.map(n => {
+    const li = el('li');
+    const b = el('button', 'not-oge' + (n.key === aktifNotKey ? ' aktif' : ''));
+    b.type = 'button';
+    b.append(el('span', 'b', n.baslik || 'Başlıksız not'), el('span', 't', tarihFormat(n.tarih)));
+    b.addEventListener('click', () => notSecIste(n.key));
+    li.append(b);
+    return li;
+  }));
+}
+
+function editorDoldur(n) {
+  aktifNotKey = n ? n.key : null;
+  $('notBaslik').value = n ? n.baslik : '';
+  $('notMetni').value = n ? n.metin : '';
+  const bozuk = !!(n && n.bozuk);
+  $('notBaslik').disabled = bozuk;
+  $('notMetni').disabled = bozuk;
+  $('notKaydetBtn').disabled = bozuk;
+  $('notSilBtn').hidden = !n;
+  notKirli = false;
+  notDurumYaz(bozuk ? '🔒 Bu not çözülemedi' : (n && n.tarih ? 'Son kayıt: ' + tarihFormat(n.tarih) : 'Yeni not'));
+  notListesiCiz();
+}
+
+async function notModalAc() {
+  const user = auth.currentUser;
+  if (!user || !anahtar) return;
+  menuKapat();
+  $('notModal').hidden = false;
+  $('notAra').value = '';
+  $('notListe').replaceChildren(el('li', 'not-bos', 'Yükleniyor…'));
+  editorDoldur(null);
+  $('notBaslik').disabled = true;
+  $('notMetni').disabled = true;
+
+  const key = anahtar;
+  try {
+    const [lSnap, eSnap] = await Promise.all([
+      db.ref(P.notListe(user.uid)).once('value'),
+      db.ref(P.eskiNot(user.uid)).once('value')
+    ]);
+    if (anahtar !== key || !notModalAcikMi()) return;
+
+    const v = lSnap.val() || {};
+    notlar = await Promise.all(Object.entries(v).map(async ([k, raw]) => {
+      if (sifreliMi(raw)) {
+        try { return Object.assign({ key: k }, notNormal(await coz(raw, key))); }
+        catch (e) { return Object.assign({ key: k, bozuk: true }, notNormal({ baslik: '🔒 Çözülemeyen not' })); }
+      }
+      return Object.assign({ key: k }, notNormal(raw));
+    }));
+
+    // Eski sürümün tek notu varsa şifreleyip listeye taşı
+    const eski = eSnap.val();
+    if (eski && eski.metin) {
+      const ref = db.ref(P.notListe(user.uid)).push();
+      const veri = notNormal({ baslik: 'Not defteri', metin: eski.metin, tarih: eski.tarih || new Date().toISOString() });
+      await db.ref().update({ [`${P.notListe(user.uid)}/${ref.key}`]: await sifrele(veri, key), [P.eskiNot(user.uid)]: null });
+      notlar.push(Object.assign({ key: ref.key }, veri));
+    }
+
+    notlariSirala();
+    if (notlar.length) {
+      editorDoldur(notlar[0]);
+      $('notlarGovde').classList.remove('editor-acik');
+    } else {
+      editorDoldur(null);
+      $('notlarGovde').classList.add('editor-acik');
+      $('notBaslik').focus();
+    }
+  } catch (err) {
+    console.error('Not okuma hatası:', err);
+    editorDoldur(null);
+    hata('Notlar getirilemedi', err.message);
+  }
+}
+
+async function kirliKontrol() {
+  if (!notKirli) return true;
+  const r = await Swal.fire({
+    icon: 'question',
+    title: 'Kaydedilmemiş değişiklikler',
+    text: 'Bu nottaki değişiklikler kaydedilsin mi?',
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonText: 'Kaydet',
+    denyButtonText: 'Kaydetme',
+    cancelButtonText: 'İptal'
+  });
+  if (r.isConfirmed) return notKaydet();
+  if (r.isDenied) { notKirli = false; return true; }
+  return false;
+}
+
+async function notSecIste(key) {
+  if (key === aktifNotKey) { $('notlarGovde').classList.add('editor-acik'); return; }
+  if (!(await kirliKontrol())) return;
+  const n = notlar.find(x => x.key === key);
+  if (!n) return;
+  editorDoldur(n);
+  $('notlarGovde').classList.add('editor-acik');
+  $('notMetni').focus();
+}
+
+async function yeniNotIste() {
+  if (!(await kirliKontrol())) return;
+  editorDoldur(null);
+  $('notlarGovde').classList.add('editor-acik');
+  $('notBaslik').focus();
+}
+
+async function notKaydet(sessiz) {
+  const user = auth.currentUser;
+  if (!user || !anahtar) return false;
+  const metin = $('notMetni').value;
+  let baslik = $('notBaslik').value.trim();
+  if (!baslik && !metin.trim()) {
+    if (!sessiz) Toast.fire({ icon: 'info', title: 'Boş not kaydedilmedi' });
+    notKirli = false;
+    return true;
+  }
+  if (!baslik) baslik = metin.trim().split('\n')[0].slice(0, 50) || 'Başlıksız not';
+  const veri = { baslik, metin, tarih: new Date().toISOString() };
+
+  const btn = $('notKaydetBtn');
+  btn.disabled = true;
+  try {
+    const ref = aktifNotKey
+      ? db.ref(`${P.notListe(user.uid)}/${aktifNotKey}`)
+      : db.ref(P.notListe(user.uid)).push();
+    await ref.set(await sifrele(veri));
+    const kayit = Object.assign({ key: ref.key }, veri);
+    const i = notlar.findIndex(n => n.key === ref.key);
+    if (i >= 0) notlar[i] = kayit; else notlar.push(kayit);
+    aktifNotKey = ref.key;
+    $('notBaslik').value = baslik;
+    $('notSilBtn').hidden = false;
+    notKirli = false;
+    notlariSirala();
+    notListesiCiz();
+    notDurumYaz('Kaydedildi · ' + tarihFormat(veri.tarih));
+    if (!sessiz) Toast.fire({ icon: 'success', title: 'Not kaydedildi' });
+    return true;
+  } catch (err) {
+    console.error('Not kaydetme hatası:', err);
+    if (!sessiz) hata('Not kaydedilemedi', err.message);
+    return false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function notSil() {
+  const user = auth.currentUser;
+  if (!user || !aktifNotKey) return;
+  const n = notlar.find(x => x.key === aktifNotKey);
+  const r = await Swal.fire({
+    icon: 'warning',
+    title: 'Not silinsin mi?',
+    text: n && n.baslik ? `"${n.baslik}" kalıcı olarak silinecek.` : 'Bu not kalıcı olarak silinecek.',
+    showCancelButton: true,
+    confirmButtonText: 'Evet, sil',
+    cancelButtonText: 'İptal',
+    confirmButtonColor: '#dc3e42',
+    reverseButtons: true
+  });
+  if (!r.isConfirmed) return;
+  try {
+    const silinen = aktifNotKey;
+    await db.ref(`${P.notListe(user.uid)}/${silinen}`).remove();
+    notlar = notlar.filter(x => x.key !== silinen);
+    notKirli = false;
+    if (notlar.length) {
+      editorDoldur(notlar[0]);
+      $('notlarGovde').classList.remove('editor-acik');
+    } else {
+      editorDoldur(null);
+    }
+    Toast.fire({ icon: 'success', title: 'Not silindi' });
+  } catch (err) {
+    hata('Silinemedi', err.message);
+  }
+}
+
+async function notModalKapat() {
+  if (!(await kirliKontrol())) return;
+  notModalZorlaKapat();
+}
+
+function notModalZorlaKapat() {
+  $('notModal').hidden = true;
+  $('notlarGovde').classList.remove('editor-acik');
+  notlar = [];
+  aktifNotKey = null;
+  notKirli = false;
+  $('notBaslik').value = '';
+  $('notMetni').value = '';
+  $('notAra').value = '';
+  $('notListe').replaceChildren();
+}
+
+async function kirliNotuKaydet() {
+  if (notModalAcikMi() && notKirli && anahtar) await notKaydet(true);
+}
+
+['notBaslik', 'notMetni'].forEach(id => $(id).addEventListener('input', () => {
+  if (!notKirli) { notKirli = true; notDurumYaz('● Kaydedilmedi'); }
+}));
+$('notEkleBtn').addEventListener('click', notModalAc);
+$('notKapatBtn').addEventListener('click', notModalKapat);
+$('notKaydetBtn').addEventListener('click', () => notKaydet());
+$('notSilBtn').addEventListener('click', notSil);
+$('yeniNotBtn').addEventListener('click', yeniNotIste);
+$('notAra').addEventListener('input', notListesiCiz);
+$('notGeriBtn').addEventListener('click', () => $('notlarGovde').classList.remove('editor-acik'));
+$('notModal').addEventListener('mousedown', (e) => { if (e.target === $('notModal')) notModalKapat(); });
+
+/* =========================================================
+   MENÜ & KISAYOLLAR
+   ========================================================= */
+function menuKapat() {
+  $('menuIcerik').classList.remove('show');
+  $('menuBtn').setAttribute('aria-expanded', 'false');
+}
+$('menuBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const acik = $('menuIcerik').classList.toggle('show');
+  $('menuBtn').setAttribute('aria-expanded', String(acik));
+});
+window.addEventListener('click', (e) => {
+  if (!e.target.closest('.dropdown')) menuKapat();
+});
+$('menuIcerik').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-menu]');
+  if (!b) return;
+  menuKapat();
+  ({ not: notModalAc, ayarlar: ayarlariAc, yardim: yardimGoster, iletisim: iletisimFormuGoster })[b.dataset.menu]();
+});
+
+document.addEventListener('keydown', (e) => {
+  const tus = e.key.toLowerCase();
+  if (e.key === 'Escape') {
+    if (Swal.isVisible()) return;
+    if (notModalAcikMi()) { notModalKapat(); return; }
+    menuKapat();
+    if (currentEditKey) formuSifirla();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && tus === 's' && notModalAcikMi()) {
+    e.preventDefault();
+    notKaydet();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && tus === 'k' && !$('appSection').hidden && !notModalAcikMi()) {
+    e.preventDefault();
+    $('kelimeBul').focus();
+    $('kelimeBul').select();
+  }
+});
+
+/* =========================================================
+   AYARLAR
+   ========================================================= */
+function ayarlariAc() {
+  gsiOnYukle().catch(() => {});
+  Swal.fire({
+    title: '⚙️ Ayarlar',
+    html: `
+      <div class="ayar-grid">
+        <div class="ayar-baslik">Yedekleme</div>
+        <button type="button" class="ayar-btn" data-islem="indir">⬇️ Yedeği indir (.json)</button>
+        <button type="button" class="ayar-btn" data-islem="yukle">⬆️ Yedekten geri yükle</button>
+        <button type="button" class="ayar-btn" data-islem="drive">☁️ Google Drive’a yedekle</button>
+        <div class="ayar-baslik">Güvenlik</div>
+        <button type="button" class="ayar-btn" data-islem="anaSifre">🔑 Ana şifreyi değiştir</button>
+        <button type="button" class="ayar-btn" data-islem="sifre">🔒 Giriş şifresini değiştir</button>
+        <button type="button" class="ayar-btn" data-islem="email">📧 E-posta değiştir</button>
+        <button type="button" class="ayar-btn tehlike" data-islem="hesapSil">🗑️ Hesabı sil</button>
+      </div>`,
+    showConfirmButton: false,
+    showCloseButton: true,
+    didOpen: (popup) => {
+      const islemler = {
+        indir: notlariIndir,
+        yukle: notlariYukle,
+        drive: yedekleDrive,
+        anaSifre: anaSifreDegistir,
+        sifre: degistirSifre,
+        email: degistirEmail,
+        hesapSil: hesapSil
+      };
+      popup.querySelectorAll('[data-islem]').forEach(b => b.addEventListener('click', () => {
+        Swal.close();
+        islemler[b.dataset.islem]();
+      }));
+    }
+  });
+}
+
+/* ---------- Yedek ---------- */
+async function hamVeri() {
+  const uid = auth.currentUser.uid;
+  const [k, l, n, m] = await Promise.all([
+    db.ref(P.kayitlar(uid)).once('value'),
+    db.ref(P.notListe(uid)).once('value'),
+    db.ref(P.eskiNot(uid)).once('value'),
+    db.ref(P.kasa(uid)).once('value')
+  ]);
+  const meta = m.val();
+  return {
+    uygulama: "Note's",
+    surum: 3,
+    sifreli: !!(meta && meta.salt),
+    olusturulma: new Date().toISOString(),
+    kasa: meta || null,
+    kayitlar: k.val() || {},
+    notlar: { liste: l.val() || {}, not: n.val() || null }
+  };
+}
+
+function yedekDosyaAdi() {
+  return `notes_yedek_${new Date().toISOString().slice(0, 10)}.json`;
+}
+
+async function notlariIndir() {
+  if (!auth.currentUser) return;
+  try {
+    const data = await hamVeri();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = yedekDosyaAdi();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Swal.fire({
+      icon: 'success',
+      title: 'Yedek indirildi',
+      text: data.sifreli
+        ? 'Yedek şifrelidir; geri yüklemek için ana şifreniz gerekir.'
+        : 'Bu yedek şifrelenmemiştir; güvenli bir yerde saklayın.'
+    });
+  } catch (err) {
+    console.error('İndirme hatası:', err);
+    hata('İndirilemedi', err.message);
+  }
+}
+
+const GECERSIZ_ANAHTAR = /[.#$\[\]\/]/;
+
+async function notlariYukle() {
+  const user = auth.currentUser;
+  if (!user || !anahtar) return;
+
+  const { value: dosya } = await Swal.fire({
+    title: '⬆️ Yedekten geri yükle',
+    html: '<p class="swal-uyari">Mevcut tüm kayıtlarınız ve notlarınız dosyadakilerle değiştirilecek.</p>',
+    input: 'file',
+    inputAttributes: { accept: '.json,application/json' },
+    showCancelButton: true,
+    confirmButtonText: 'Devam',
+    cancelButtonText: 'İptal',
+    inputValidator: (f) => !f && 'Lütfen bir dosya seçin.'
+  });
+  if (!dosya) return;
+
+  let data;
+  try {
+    data = JSON.parse(await dosya.text());
+  } catch (e) {
+    return hata('Hatalı dosya', 'Seçilen dosya geçerli bir JSON değil.');
+  }
+  if (!data || typeof data !== 'object' || (!data.kayitlar && !data.notlar)) {
+    return hata('Hatalı dosya', 'Bu dosya bir Note\'s yedeği gibi görünmüyor.');
+  }
+
+  const kayitHam = (data.kayitlar && typeof data.kayitlar === 'object') ? data.kayitlar : {};
+  let notHam = {};
+  let eskiTek = null;
+  const nd = data.notlar;
+  if (nd && typeof nd === 'object') {
+    if (nd.liste && typeof nd.liste === 'object') notHam = nd.liste;
+    if (typeof nd.metin === 'string') eskiTek = nd;
+    else if (nd.not && typeof nd.not.metin === 'string') eskiTek = nd.not;
+  }
+
+  // Şifreli yedekse, yedeğin anahtarını bul
+  const sifreliVar = [...Object.values(kayitHam), ...Object.values(notHam)].some(sifreliMi);
+  let yedekKey = null;
+  if (sifreliVar) {
+    if (!data.kasa || !data.kasa.salt) return hata('Hatalı dosya', 'Şifreli yedekte kasa bilgisi eksik.');
+    if (kasaMeta && data.kasa.salt === kasaMeta.salt) {
+      yedekKey = anahtar;
+    } else {
+      const p = await Swal.fire({
+        title: 'Yedeğin ana şifresi',
+        text: 'Bu yedek farklı bir ana şifreyle oluşturulmuş. O zamanki ana şifreyi girin.',
+        input: 'text',
+        customClass: { input: 'maskeli' },
+        inputAttributes: { autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false' },
+        showCancelButton: true,
+        confirmButtonText: 'Devam',
+        cancelButtonText: 'İptal',
+        inputValidator: (v) => !v && 'Şifre girin.'
+      });
+      if (!p.isConfirmed) return;
+      Swal.fire({ title: 'Kontrol ediliyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      yedekKey = await metaDogrula(p.value, data.kasa);
+      if (!yedekKey) return hata('Yedek açılamadı', 'Ana şifre yanlış.');
+    }
+  }
+
+  const kay = {}, not = {};
+  let atlanan = 0;
+  for (const [k, v] of Object.entries(kayitHam)) {
+    if (!v || typeof v !== 'object' || GECERSIZ_ANAHTAR.test(k)) { atlanan++; continue; }
+    try { kay[k] = sifreliMi(v) ? kayitNormal(await coz(v, yedekKey)) : kayitNormal(v); }
+    catch (e) { atlanan++; }
+  }
+  for (const [k, v] of Object.entries(notHam)) {
+    if (!v || typeof v !== 'object' || GECERSIZ_ANAHTAR.test(k)) { atlanan++; continue; }
+    try { not[k] = sifreliMi(v) ? notNormal(await coz(v, yedekKey)) : notNormal(v); }
+    catch (e) { atlanan++; }
+  }
+  if (eskiTek && eskiTek.metin) {
+    not[db.ref().push().key] = notNormal({ baslik: 'Not defteri', metin: eskiTek.metin, tarih: eskiTek.tarih || new Date().toISOString() });
+  }
+
+  const kSay = Object.keys(kay).length, nSay = Object.keys(not).length;
+  const onay = await Swal.fire({
+    icon: 'warning',
+    title: 'Emin misiniz?',
+    text: `${kSay} kayıt ve ${nSay} not yüklenecek${atlanan ? ` (${atlanan} öğe okunamadığı için atlandı)` : ''}. Mevcut veriler silinecek.`,
+    showCancelButton: true,
+    confirmButtonText: 'Evet, yükle',
+    cancelButtonText: 'İptal',
+    reverseButtons: true
+  });
+  if (!onay.isConfirmed) return;
+
+  try {
+    Swal.fire({ title: 'Şifreleniyor ve yükleniyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const kEnc = {}, nEnc = {};
+    for (const [k, v] of Object.entries(kay)) kEnc[k] = await sifrele(v);
+    for (const [k, v] of Object.entries(not)) nEnc[k] = await sifrele(v);
+    await db.ref().update({
+      [P.kayitlar(user.uid)]: kSay ? kEnc : null,
+      [P.notListe(user.uid)]: nSay ? nEnc : null,
+      [P.eskiNot(user.uid)]: null
+    });
+    if (notModalAcikMi()) notModalZorlaKapat();
+    Swal.fire({ icon: 'success', title: 'Veriler yüklendi', text: `${kSay} kayıt ve ${nSay} not geri yüklendi.` });
+  } catch (err) {
+    console.error('Yükleme hatası:', err);
+    hata('Yüklenemedi', err.message);
+  }
+}
+
+/* ---------- Google Drive (Google Identity Services) ---------- */
+let gsiYukleniyor = null;
+function gsiOnYukle() {
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  if (!gsiYukleniyor) {
+    gsiYukleniyor = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = () => { gsiYukleniyor = null; reject(new Error('Google kütüphanesi yüklenemedi.')); };
+      document.head.appendChild(s);
+    });
+  }
+  return gsiYukleniyor;
+}
+
+function yedekleDrive() {
+  if (!auth.currentUser) return;
+  if (!(window.google && google.accounts && google.accounts.oauth2)) {
+    Swal.fire({ title: 'Google bağlantısı hazırlanıyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    gsiOnYukle()
+      .then(() => Swal.fire({ icon: 'info', text: 'Hazır. Lütfen "Google Drive’a yedekle" seçeneğine tekrar tıklayın.' }))
+      .catch(err => hata('Google', err.message));
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: (resp) => {
+      if (resp.error) return hata('Google', 'Yetki alınamadı: ' + resp.error);
+      driveYukle(resp.access_token);
+    },
+    error_callback: (err) => {
+      if (err && err.type === 'popup_closed') return;
+      hata('Google', 'Google hesabına bağlanılamadı' + (err && err.type ? ` (${err.type})` : '') + '.');
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function driveYukle(token) {
+  Swal.fire({ title: 'Drive’a yükleniyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try {
+    const data = await hamVeri();
+    const metadata = { name: yedekDosyaAdi(), mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: form
+    });
+    if (!res.ok) throw new Error('Google API yanıtı: ' + res.status);
+    Swal.fire({ icon: 'success', title: 'Google Drive’a yedeklendi', text: metadata.name + (data.sifreli ? ' (şifreli)' : '') });
+  } catch (err) {
+    console.error('Drive hatası:', err);
+    hata('Drive’a yüklenemedi', err.message);
+  }
+}
+
+/* ---------- Ana şifre değiştirme (tüm veriyi yeniden şifreler) ---------- */
+async function anaSifreDegistir() {
+  const user = auth.currentUser;
+  if (!user || !anahtar) return;
+  const r = await Swal.fire({
+    title: '🔑 Ana şifreyi değiştir',
+    html: `
+      <input type="text" id="anaMevcut" class="swal2-input maskeli" placeholder="Mevcut ana şifre" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="text" id="anaYeni" class="swal2-input maskeli" placeholder="Yeni ana şifre (en az 8 karakter)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="text" id="anaYeniTekrar" class="swal2-input maskeli" placeholder="Yeni ana şifre (tekrar)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <p class="swal-uyari small" style="margin-top:14px;">Yeni şifreyi unutursanız verileriniz kurtarılamaz. Eski yedekler eski ana şifreyle açılır.</p>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Değiştir',
+    cancelButtonText: 'İptal',
+    preConfirm: () => {
+      const mevcut = $('anaMevcut').value;
+      const yeni = $('anaYeni').value;
+      const tekrar = $('anaYeniTekrar').value;
+      if (!mevcut || !yeni || !tekrar) return Swal.showValidationMessage('Tüm alanları doldurun.');
+      if (yeni.length < 8) return Swal.showValidationMessage('Yeni ana şifre en az 8 karakter olmalı.');
+      if (yeni !== tekrar) return Swal.showValidationMessage('Yeni şifreler eşleşmiyor.');
+      if (yeni === mevcut) return Swal.showValidationMessage('Yeni şifre mevcut şifreyle aynı olamaz.');
+      return { mevcut, yeni };
+    }
+  });
+  if (!r.isConfirmed) return;
+
+  Swal.fire({ title: 'Yeniden şifreleniyor…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try {
+    await kirliNotuKaydet();
+    const eskiKey = await metaDogrula(r.value.mevcut, kasaMeta);
+    if (!eskiKey) throw new Error('Mevcut ana şifre yanlış.');
+
+    const uid = user.uid;
+    const [kS, lS] = await Promise.all([
+      db.ref(P.kayitlar(uid)).once('value'),
+      db.ref(P.notListe(uid)).once('value')
+    ]);
+    const kay = {}, not = {};
+    for (const [k, v] of Object.entries(kS.val() || {})) kay[k] = sifreliMi(v) ? kayitNormal(await coz(v, eskiKey)) : kayitNormal(v);
+    for (const [k, v] of Object.entries(lS.val() || {})) not[k] = sifreliMi(v) ? notNormal(await coz(v, eskiKey)) : notNormal(v);
+
+    const { key, meta } = await metaOlustur(r.value.yeni);
+    const up = {};
+    for (const [k, v] of Object.entries(kay)) up[`${P.kayitlar(uid)}/${k}`] = await sifrele(v, key);
+    for (const [k, v] of Object.entries(not)) up[`${P.notListe(uid)}/${k}`] = await sifrele(v, key);
+    up[P.kasa(uid)] = meta;
+
+    const eskiAnahtar = anahtar, eskiMeta = kasaMeta;
+    anahtar = key;
+    kasaMeta = meta;
+    try {
+      await db.ref().update(up);
+    } catch (e) {
+      anahtar = eskiAnahtar;
+      kasaMeta = eskiMeta;
+      throw e;
+    }
+    if (notModalAcikMi()) notModalZorlaKapat();
+    Swal.fire({ icon: 'success', title: 'Ana şifre değiştirildi', text: 'Tüm veriler yeni şifreyle yeniden şifrelendi. Yeni bir yedek almanız önerilir.' });
+  } catch (err) {
+    console.error('Ana şifre hatası:', err);
+    hata('Ana şifre değiştirilemedi', err.message);
+  }
+}
+
+/* ---------- Hesap işlemleri ---------- */
+function yenidenDogrula(user, sifre) {
+  const cred = firebase.auth.EmailAuthProvider.credential(user.email, sifre);
+  return user.reauthenticateWithCredential(cred);
+}
+
+async function degistirSifre() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    title: '🔒 Giriş şifresini değiştir',
+    html: `
+      <input type="text" id="mevcutSifreInput" class="swal2-input maskeli" placeholder="Mevcut giriş şifresi" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="text" id="yeniSifreInput" class="swal2-input maskeli" placeholder="Yeni şifre" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="text" id="yeniSifreTekrarInput" class="swal2-input maskeli" placeholder="Yeni şifre (tekrar)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Değiştir',
+    cancelButtonText: 'İptal',
+    preConfirm: () => {
+      const mevcut = $('mevcutSifreInput').value;
+      const yeni = $('yeniSifreInput').value;
+      const tekrar = $('yeniSifreTekrarInput').value;
+      if (!mevcut || !yeni || !tekrar) return Swal.showValidationMessage('Tüm alanları doldurun.');
+      if (yeni.length < 6) return Swal.showValidationMessage('Yeni şifre en az 6 karakter olmalı.');
+      if (yeni !== tekrar) return Swal.showValidationMessage('Yeni şifreler eşleşmiyor.');
+      if (yeni === mevcut) return Swal.showValidationMessage('Yeni şifre mevcut şifreyle aynı olamaz.');
+      return { mevcut, yeni };
+    }
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await yenidenDogrula(user, r.value.mevcut);
+    await user.updatePassword(r.value.yeni);
+    Swal.fire({ icon: 'success', title: 'Giriş şifresi değiştirildi', text: 'Ana şifreniz değişmedi.' });
+  } catch (err) {
+    console.error('Şifre değiştirme hatası:', err);
+    hata('Şifre değiştirilemedi', authHataMesaji(err));
+  }
+}
+
+async function degistirEmail() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    title: '📧 E-posta değiştir',
+    html: `
+      <input id="swal-old-email" class="swal2-input" type="email" disabled>
+      <input id="swal-new-email" class="swal2-input" type="email" placeholder="Yeni e-posta adresi" autocomplete="off">
+      <input id="swal-password" class="swal2-input maskeli" type="text" placeholder="Giriş şifreniz" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Doğrulama gönder',
+    cancelButtonText: 'İptal',
+    didOpen: () => { $('swal-old-email').value = user.email || ''; },
+    preConfirm: () => {
+      const yeni = $('swal-new-email').value.trim();
+      const sifre = $('swal-password').value;
+      if (!yeni || !sifre) return Swal.showValidationMessage('Tüm alanları doldurun.');
+      if (!/^\S+@\S+\.\S+$/.test(yeni)) return Swal.showValidationMessage('Geçerli bir e-posta adresi girin.');
+      if (yeni.toLowerCase() === (user.email || '').toLowerCase()) return Swal.showValidationMessage('Yeni adres mevcut adresle aynı.');
+      return { yeni, sifre };
+    }
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await yenidenDogrula(user, r.value.sifre);
+    await user.verifyBeforeUpdateEmail(r.value.yeni);
+    const bilgi = el('div');
+    bilgi.append(el('strong', null, r.value.yeni), ' adresine gelen bağlantıya tıkladığınızda e-postanız değişecek. Ardından yeni adresle tekrar giriş yapmanız gerekecek.');
+    Swal.fire({ icon: 'success', title: 'Doğrulama bağlantısı gönderildi', html: bilgi });
+  } catch (err) {
+    console.error('E-posta değiştirme hatası:', err);
+    hata('E-posta değiştirilemedi', authHataMesaji(err));
+  }
+}
+
+async function hesapSil() {
+  const user = auth.currentUser;
+  if (!user) return;
+  const r = await Swal.fire({
+    icon: 'warning',
+    title: 'Hesap kalıcı olarak silinsin mi?',
+    html: `
+      <p class="swal-uyari">Bu işlem geri alınamaz! Tüm kayıtlarınız ve notlarınız silinecek.</p>
+      <input type="text" id="hesapSilSifre" class="swal2-input maskeli" placeholder="Giriş şifreniz" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="text" id="hesapSilOnay" class="swal2-input" placeholder='Onay için "SİL" yazın' autocomplete="off">`,
+    showCancelButton: true,
+    confirmButtonColor: '#dc3e42',
+    confirmButtonText: 'Hesabı sil',
+    cancelButtonText: 'Vazgeç',
+    reverseButtons: true,
+    focusConfirm: false,
+    preConfirm: () => {
+      const sifre = $('hesapSilSifre').value;
+      const onay = $('hesapSilOnay').value.trim().toLocaleUpperCase('tr');
+      if (!sifre) return Swal.showValidationMessage('Şifrenizi girin.');
+      if (onay !== 'SİL') return Swal.showValidationMessage('Onay için "SİL" yazın.');
+      return sifre;
+    }
+  });
+  if (!r.isConfirmed) return;
+  try {
+    await yenidenDogrula(user, r.value);
+    if (kayitRef) { kayitRef.off(); kayitRef = null; }
+    await db.ref(`notlar/${user.uid}`).remove();
+    await db.ref(P.kayitlar(user.uid)).remove();
+    await user.delete();
+    Swal.fire({ icon: 'success', title: 'Hesap silindi', text: 'Hesabınız ve tüm verileriniz silindi.' });
+  } catch (err) {
+    console.error('Hesap silme hatası:', err);
+    hata('Hesap silinemedi', authHataMesaji(err));
+  }
+}
+
+/* =========================================================
+   YARDIM & İLETİŞİM
+   ========================================================= */
+function yardimGoster() {
+  Swal.fire({
+    title: '❓ Yardım',
+    html: `
+      <ul class="yardim-liste">
+        <li>🔐 Tüm kayıtlar ve notlar <b>ana şifrenizle</b> cihazınızda şifrelenir (AES-256). Firebase’de yalnızca okunamaz hâli durur. Ana şifreyi unutursanız veriler kurtarılamaz.</li>
+        <li>🔒 düğmesi kasayı kilitler (çıkış yapmadan), 🚪 düğmesi çıkış yapar.</li>
+        <li>${SESSION_TIMEOUT / 1000} saniye işlem yapmazsanız otomatik çıkış yapılır (son ${WARNING_TIME / 1000} saniyede uyarı çıkar). Açık bir not varsa önce kaydedilir.</li>
+        <li>🙈 <b>Gizlilik modu</b> açıkken kullanıcı adı ve şifre bulanık görünür; görmek için üzerine tıklayın. 👁️ ile tamamen kapatabilirsiniz.</li>
+        <li>⎘ ile kopyaladığınız bilgi ${PANO_SURE / 1000} saniye sonra panodan silinir.</li>
+        <li>⭐ ile favorilere eklenen kayıtlar en üstte durur. Kategori rozetine tıklayınca o kategori filtrelenir.</li>
+        <li>Bir alana <code>**https://site.com**</code> yazarsanız tıklanabilir bağlantıya dönüşür.</li>
+        <li>🎲 düğmesi 20 karakterlik güçlü bir şifre üretir.</li>
+        <li>Kısayollar: <code>Ctrl+K</code> arama, <code>Enter</code> kaydet, <code>Esc</code> iptal/kapat, notlarda <code>Ctrl+S</code> kaydet.</li>
+      </ul>`,
+    confirmButtonText: 'Tamam'
+  });
+}
+
+async function iletisimFormuGoster() {
+  const r = await Swal.fire({
+    title: '📩 İletişim',
+    html: `
+      <input id="swal-ad" class="swal2-input" placeholder="Adınız">
+      <input id="swal-email" class="swal2-input" type="email" placeholder="E-posta">
+      <textarea id="swal-mesaj" class="swal2-textarea" placeholder="Mesajınız…"></textarea>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Gönder',
+    cancelButtonText: 'İptal',
+    preConfirm: () => {
+      const mesaj = $('swal-mesaj').value.trim();
+      if (!mesaj) return Swal.showValidationMessage('Lütfen bir mesaj yazın.');
+      return { ad: $('swal-ad').value.trim(), email: $('swal-email').value.trim(), mesaj };
+    }
+  });
+  if (!r.isConfirmed) return;
+  if (!window.emailjs) return hata('Hata', 'E-posta servisi yüklenemedi.');
+  try {
+    await emailjs.send('service_8ofb079', 'template_80rg1o1', {
+      name: r.value.ad,
+      email: r.value.email,
+      message: r.value.mesaj,
+      time: new Date().toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    });
+    Swal.fire({ icon: 'success', title: 'Mesajınız gönderildi' });
+  } catch (err) {
+    hata('Mesaj gönderilemedi', (err && err.text) || 'Bilinmeyen hata');
+  }
+}
+</script>
+</body>
+</html>
